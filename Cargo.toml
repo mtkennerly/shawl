@@ -1,0 +1,15 @@
+[package]
+name = "shawl"
+version = "0.1.0"
+authors = ["mtkennerly <mtkennerly@gmail.com>"]
+edition = "2018"
+description = "Windows service wrapper for arbitrary commands"
+repository = "https://github.com/mtkennerly/shawl"
+readme = "README.md"
+license = "MIT"
+
+[dependencies]
+log = "0.4.8"
+simplelog = "0.7.3"
+structopt = "0.3.2"
+windows-service = "0.2.0"
