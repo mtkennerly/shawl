@@ -33,6 +33,27 @@ in an MSI, because Shawl doesn't have any special setup of its own.
 Prebuilt binaries are available on the
 [releases page](https://github.com/mtkennerly/shawl/releases).
 
+## CLI
+
+```console
+$ shawl --help
+USAGE:
+    shawl.exe [FLAGS] [OPTIONS] [--] <command>...
+
+FLAGS:
+    -h, --help              Prints help information
+        --no-restart-err    Do not restart the wrapped program if it exits with a nonzero code
+        --restart-ok        Restart the wrapped program if it exits with 0
+    -V, --version           Prints version information
+
+OPTIONS:
+        --stop-timeout <stop-timeout>    How long to wait in milliseconds between sending the wrapped process a ctrl-C
+                                         event and forcibly killing it [default: 3000]
+
+ARGS:
+    <command>...    Command to run as a service
+```
+
 ## Development
 
 Commands assume you are using [Git Bash](https://git-scm.com) on Windows:
