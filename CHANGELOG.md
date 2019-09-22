@@ -1,4 +1,4 @@
-## Unreleased
+## v0.2.0 (2019-09-22)
 
 * Send ctrl-C to child process first instead of always forcibly killing it.
 * Report command failure as a service-specific error to Windows.
