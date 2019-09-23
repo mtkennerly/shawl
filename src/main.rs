@@ -1,9 +1,9 @@
-use log::info;
+use log::{debug, error};
+use std::io::Write;
 use structopt::StructOpt;
 
 #[derive(structopt::StructOpt, Debug)]
-#[structopt(name = "shawl", about = "Wrap arbitrary commands as Windows services")]
-struct Cli {
+struct CommonOpts {
     /// Restart the wrapped program if it exits with 0
     #[structopt(long)]
     restart_ok: bool,
@@ -22,31 +22,150 @@ struct Cli {
     command: Vec<String>,
 }
 
-fn prepare_logging() -> Result<(), Box<std::error::Error>> {
+#[derive(structopt::StructOpt, Debug)]
+enum Subcommand {
+    #[structopt(about = "Add a new service")]
+    Add {
+        #[structopt(flatten)]
+        common: CommonOpts,
+
+        /// Name of the service to create
+        #[structopt(long)]
+        name: String,
+    },
+    #[structopt(about = "Run a command as a service; only works when launched by the Windows service manager")]
+    Run {
+        #[structopt(flatten)]
+        common: CommonOpts,
+
+        /// Name of the service; used in logging, but does not need to match real name
+        #[structopt(long, default_value = "Shawl")]
+        name: String,
+    },
+}
+
+#[derive(structopt::StructOpt, Debug)]
+#[structopt(
+    name = "shawl",
+    about = "Wrap arbitrary commands as Windows services",
+    setting(structopt::clap::AppSettings::SubcommandsNegateReqs)
+)]
+struct Cli {
+    #[structopt(subcommand)]
+    sub: Subcommand,
+}
+
+fn prepare_logging(console: bool) -> Result<(), Box<std::error::Error>> {
     let mut log_file = std::env::current_exe()?;
     log_file.pop();
     log_file.push("shawl.log");
 
-    simplelog::WriteLogger::init(
-        simplelog::LevelFilter::Debug,
-        simplelog::ConfigBuilder::new()
-            .set_time_format_str("%Y-%m-%d %H:%M:%S")
-            .build(),
-        std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(log_file)?,
-    )?;
+    let mut loggers: Vec<Box<simplelog::SharedLogger>> = vec![
+        simplelog::WriteLogger::new(
+            simplelog::LevelFilter::Debug,
+            simplelog::ConfigBuilder::new()
+                .set_time_format_str("%Y-%m-%d %H:%M:%S")
+                .build(),
+            std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(log_file)?,
+        )
+    ];
+
+    if console {
+        loggers.push(
+            simplelog::TermLogger::new(
+                simplelog::LevelFilter::Info,
+                simplelog::ConfigBuilder::new()
+                    .set_time_format_str("")
+                    .build(),
+                simplelog::TerminalMode::default(),
+            ).expect("Unable to create terminal logger")
+        );
+    }
+
+    simplelog::CombinedLogger::init(loggers)?;
 
     Ok(())
 }
 
+fn add_service(name: String, opts: CommonOpts) -> Result<(), ()> {
+    let shawl_path = std::env::current_exe().expect("Unable to determine Shawl location");
+    let mut shawl_args = vec![
+        "run".to_string(),
+        "--name".to_string(),
+        name.clone(),
+        "--stop-timeout".to_string(),
+        opts.stop_timeout.to_string(),
+    ];
+    if opts.restart_ok {
+        shawl_args.push("--restart-ok".to_string());
+    }
+    if opts.no_restart_err {
+        shawl_args.push("--no-restart-err".to_string());
+    }
+
+    let output = std::process::Command::new("sc")
+        .arg("create")
+        .arg(&name)
+        .arg("binPath=")
+        .arg(format!(
+            "{} {} -- {}",
+            shawl_path.display(),
+            shawl_args.join(" "),
+            opts.command.join(" ")
+        ))
+        .output()
+        .expect("Failed to create the service");
+    match output.status.code() {
+        Some(0) => Ok(()),
+        Some(x) => {
+            error!("Failed to create the service. Error code: {}.", x);
+            error!("SC stdout:\n{}", String::from_utf8_lossy(&output.stdout));
+            error!("SC stderr:\n{}", String::from_utf8_lossy(&output.stderr));
+            Err(())
+        }
+        None => {
+            error!("Failed to create the service. Output:");
+            std::io::stderr().write_all(&output.stdout).unwrap();
+            std::io::stderr().write_all(&output.stderr).unwrap();
+            Err(())
+        }
+    }
+}
+
 #[cfg(windows)]
-fn main() -> windows_service::Result<()> {
-    let _ = prepare_logging();
-    info!("********** LAUNCH **********");
-    info!("{:?}", Cli::from_args());
-    service::run()
+fn main() -> Result<(), Box<std::error::Error>> {
+    let cli = Cli::from_args();
+    let console = match cli.sub {
+        Subcommand::Run { .. } => false,
+        _ => true,
+    };
+
+    prepare_logging(console)?;
+    debug!("********** LAUNCH **********");
+    debug!("{:?}", cli);
+
+    match cli.sub {
+        Subcommand::Add { name, common: opts } => match add_service(name, opts) {
+            Ok(_) => (),
+            Err(_) => std::process::exit(1),
+        },
+        Subcommand::Run { name, .. } => match service::run(name) {
+            Ok(_) => (),
+            Err(e) => {
+                error!("Failed to run the service:\n{:#?}", e);
+                // We wouldn't have a console if the Windows service manager
+                // ran this, but if we failed here, then it's likely the user
+                // tried to run it directly, so try showing them the error:
+                println!("Failed to run the service:\n{:#?}", e);
+                std::process::exit(1)
+            },
+        },
+    }
+    debug!("Finished successfully");
+    Ok(())
 }
 
 #[cfg(not(windows))]
@@ -75,7 +194,7 @@ fn check_process(child: &mut std::process::Child) -> Result<ProcessStatus, Box<s
 
 #[cfg(windows)]
 mod service {
-    use log::{error, info};
+    use log::{debug, error, info};
     use structopt::StructOpt;
     use windows_service::{
         define_windows_service,
@@ -87,13 +206,12 @@ mod service {
         service_dispatcher,
     };
 
-    const SERVICE_NAME: &str = "shawl-svc";
     const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 
     define_windows_service!(ffi_service_main, service_main);
 
-    pub fn run() -> windows_service::Result<()> {
-        service_dispatcher::start(SERVICE_NAME, ffi_service_main)
+    pub fn run(name: String) -> windows_service::Result<()> {
+        service_dispatcher::start(name, ffi_service_main)
     }
 
     pub fn service_main(_arguments: Vec<std::ffi::OsString>) {
@@ -113,6 +231,13 @@ mod service {
     pub fn run_service() -> windows_service::Result<()> {
         let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
         let cli = crate::Cli::from_args();
+        let (name, opts) = match cli.sub {
+            crate::Subcommand::Run { name, common: opts } => (name, opts),
+            _ => {
+                // Can't get here.
+                return Ok(());
+            }
+        };
         let mut service_exit_code = ServiceExitCode::NO_ERROR;
 
         let ignore_ctrlc = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -136,7 +261,7 @@ mod service {
             }
         };
 
-        let status_handle = service_control_handler::register(SERVICE_NAME, event_handler)?;
+        let status_handle = service_control_handler::register(name, event_handler)?;
 
         status_handle.set_service_status(ServiceStatus {
             service_type: SERVICE_TYPE,
@@ -147,11 +272,11 @@ mod service {
             wait_hint: std::time::Duration::default(),
         })?;
 
-        info!("Entering main service loop");
+        debug!("Entering main service loop");
         'outer: loop {
             info!("Launching command");
-            let mut child = match std::process::Command::new(&cli.command[0])
-                .args(&cli.command[1..])
+            let mut child = match std::process::Command::new(&opts.command[0])
+                .args(&opts.command[1..])
                 .spawn()
             {
                 Ok(c) => c,
@@ -167,7 +292,7 @@ mod service {
                             controls_accepted: ServiceControlAccept::empty(),
                             exit_code: ServiceExitCode::NO_ERROR,
                             checkpoint: 0,
-                            wait_hint: std::time::Duration::from_millis(cli.stop_timeout + 1000),
+                            wait_hint: std::time::Duration::from_millis(opts.stop_timeout + 1000),
                         })?;
 
                         ignore_ctrlc.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -189,7 +314,7 @@ mod service {
                         loop {
                             match crate::check_process(&mut child) {
                                 Ok(crate::ProcessStatus::Running) => {
-                                    if start_time.elapsed().as_millis() < cli.stop_timeout.into() {
+                                    if start_time.elapsed().as_millis() < opts.stop_timeout.into() {
                                         std::thread::sleep(std::time::Duration::from_millis(50))
                                     } else {
                                         info!("Killing command because stop timeout expired");
@@ -229,7 +354,7 @@ mod service {
                     Ok(crate::ProcessStatus::Success(_)) => {
                         info!("Command finished successfully");
                         service_exit_code = ServiceExitCode::NO_ERROR;
-                        match cli.restart_ok {
+                        match opts.restart_ok {
                             true => break 'inner,
                             false => break 'outer,
                         }
@@ -237,7 +362,7 @@ mod service {
                     Ok(crate::ProcessStatus::Failure(code)) => {
                         info!("Command failed with code {}", code);
                         service_exit_code = ServiceExitCode::ServiceSpecific(code as u32);
-                        match !cli.no_restart_err {
+                        match !opts.no_restart_err {
                             true => break 'inner,
                             false => break 'outer,
                         }
@@ -246,7 +371,7 @@ mod service {
                         info!("Command was terminated by a signal");
                         service_exit_code =
                             ServiceExitCode::Win32(winapi::shared::winerror::ERROR_PROCESS_ABORTED);
-                        match !cli.no_restart_err {
+                        match !opts.no_restart_err {
                             true => break 'inner,
                             false => break 'outer,
                         }
@@ -260,7 +385,7 @@ mod service {
                 }
             }
         }
-        info!("Exited main service loop");
+        debug!("Exited main service loop");
 
         status_handle.set_service_status(ServiceStatus {
             service_type: SERVICE_TYPE,

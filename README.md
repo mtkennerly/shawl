@@ -6,8 +6,8 @@ simply pass the command for it to run via CLI, without your program needing to
 be service-aware. Shawl's own options and your command are separated by `--`:
 
 ```
-shawl -- my-app.exe --foo bar
-shawl --restart-ok --no-restart-err --stop-timeout 5000 -- my-app.exe
+shawl run -- C:/path/my-app.exe --foo bar
+shawl run --restart-ok --no-restart-err --stop-timeout 5000 -- C:/path/my-app.exe
 ```
 
 Shawl will inspect the state of your program in order to report the correct
@@ -28,30 +28,40 @@ and [NSSM](https://nssm.cc) in that their interfaces rely on running a special
 install command to prepare the service, which means, for example, that you have
 to run a `CustomAction` if you're installing with an MSI. With Shawl, you can
 configure the service however you want, such as with the normal `ServiceInstall`
-in an MSI, because Shawl doesn't have any special setup of its own.
+in an MSI or by running `sc create`, because Shawl doesn't have any special
+setup of its own. That said, Shawl does provide a `shawl add` command to
+quickly create a wrapped service if you prefer to do it that way:
 
-Prebuilt binaries are available on the
-[releases page](https://github.com/mtkennerly/shawl/releases).
+```
+shawl add --name my-app --restart-ok -- C:/path/my-app.exe
+sc start my-app
+```
+
+## Installation
+* Prebuilt binaries are available on the
+  [releases page](https://github.com/mtkennerly/shawl/releases).
+  It's portable, so you can simply download it and put it anywhere
+  without going through an installer.
+* If you have Rust installed, you can run `cargo install shawl`.
 
 ## CLI
 
 ```console
 $ shawl --help
+Wrap arbitrary commands as Windows services
+
 USAGE:
-    shawl.exe [FLAGS] [OPTIONS] [--] <command>...
+    shawl.exe
+    shawl.exe <SUBCOMMAND>
 
 FLAGS:
-    -h, --help              Prints help information
-        --no-restart-err    Do not restart the wrapped program if it exits with a nonzero code
-        --restart-ok        Restart the wrapped program if it exits with 0
-    -V, --version           Prints version information
+    -h, --help       Prints help information
+    -V, --version    Prints version information
 
-OPTIONS:
-        --stop-timeout <stop-timeout>    How long to wait in milliseconds between sending the wrapped process a ctrl-C
-                                         event and forcibly killing it [default: 3000]
-
-ARGS:
-    <command>...    Command to run as a service
+SUBCOMMANDS:
+    add     Add a new service
+    help    Prints this message or the help of the given subcommand(s)
+    run     Run a command as a service; only works when launched by the Windows service manager
 ```
 
 ## Development
@@ -65,7 +75,8 @@ Commands assume you are using [Git Bash](https://git-scm.com) on Windows:
   * 32-bit: `cargo build --release --target i686-pc-windows-msvc`
   * 64-bit: `cargo build --release --target x86_64-pc-windows-msvc`
 * Test as a service:
-  * Create: `sc create shawl binPath= "$(readlink -f ./target/debug/shawl.exe) -- $(readlink -f ./target/debug/child.exe | cut -c 3-)"`
+  * Create: `sc create shawl binPath= "$(readlink -f ./target/debug/shawl.exe) -- $(readlink -f ./target/debug/shawl-child.exe | cut -c 3-)"`
+    * Or via Shawl itself: `cargo run --bin shawl -- add --name shawl -- $(readlink -f ./target/debug/shawl-child.exe)`
     * Pass `--infinite` to the child to force a timeout on stop.
     * Pass `--exit 123` to the child to exit with that code.
   * Inspect: `sc qc shawl`

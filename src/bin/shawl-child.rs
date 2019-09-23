@@ -3,7 +3,7 @@ use log::info;
 use structopt::StructOpt;
 
 #[derive(structopt::StructOpt, Debug)]
-#[structopt(name = "shawl-child")]
+#[structopt(name = "shawl-child", about = "Dummy program to test wrapping with Shawl")]
 struct Cli {
     /// Run forever unless forcibly killed
     #[structopt(long)]
@@ -17,7 +17,7 @@ struct Cli {
 fn prepare_logging() -> Result<(), Box<std::error::Error>> {
     let mut log_file = std::env::current_exe()?;
     log_file.pop();
-    log_file.push("child.log");
+    log_file.push("shawl-child.log");
 
     simplelog::CombinedLogger::init(vec![
         simplelog::TermLogger::new(
