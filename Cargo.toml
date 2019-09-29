@@ -15,3 +15,6 @@ simplelog = "0.7.3"
 structopt = "0.3.2"
 winapi = { version = "0.3.8", features = ["wincon"] }
 windows-service = "0.2.0"
+
+[dev-dependencies]
+speculate = "0.1.2"

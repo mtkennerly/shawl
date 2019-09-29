@@ -3,7 +3,10 @@ use log::info;
 use structopt::StructOpt;
 
 #[derive(structopt::StructOpt, Debug)]
-#[structopt(name = "shawl-child", about = "Dummy program to test wrapping with Shawl")]
+#[structopt(
+    name = "shawl-child",
+    about = "Dummy program to test wrapping with Shawl"
+)]
 struct Cli {
     /// Run forever unless forcibly killed
     #[structopt(long)]

@@ -2,6 +2,9 @@
 
 * Added `shawl add` for quickly creating a Shawl-wrapped service.
 * Moved existing CLI functionality under `shawl run`.
+* Generalized `--restart-ok` and `--no-restart-err` into
+  `--(no-)restart` and `--restart-if(-not)`.
+* Added `--pass` to customize which exit codes are considered successful.
 
 ## v0.2.0 (2019-09-22)
 
