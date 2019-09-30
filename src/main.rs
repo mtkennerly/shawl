@@ -74,12 +74,12 @@ struct Cli {
     sub: Subcommand,
 }
 
-fn prepare_logging(console: bool) -> Result<(), Box<std::error::Error>> {
+fn prepare_logging(console: bool) -> Result<(), Box<dyn std::error::Error>> {
     let mut log_file = std::env::current_exe()?;
     log_file.pop();
     log_file.push("shawl.log");
 
-    let mut loggers: Vec<Box<simplelog::SharedLogger>> = vec![simplelog::WriteLogger::new(
+    let mut loggers: Vec<Box<dyn simplelog::SharedLogger>> = vec![simplelog::WriteLogger::new(
         simplelog::LevelFilter::Debug,
         simplelog::ConfigBuilder::new()
             .set_time_format_str("%Y-%m-%d %H:%M:%S")
@@ -209,7 +209,7 @@ fn construct_shawl_run_args(name: &String, opts: &CommonOpts) -> Vec<String> {
 }
 
 #[cfg(windows)]
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::from_args();
     let console = match cli.sub {
         Subcommand::Run { .. } => false,
@@ -252,7 +252,9 @@ enum ProcessStatus {
     Terminated,
 }
 
-fn check_process(child: &mut std::process::Child) -> Result<ProcessStatus, Box<std::error::Error>> {
+fn check_process(
+    child: &mut std::process::Child,
+) -> Result<ProcessStatus, Box<dyn std::error::Error>> {
     match child.try_wait() {
         Ok(None) => Ok(ProcessStatus::Running),
         Ok(Some(status)) => match status.code() {

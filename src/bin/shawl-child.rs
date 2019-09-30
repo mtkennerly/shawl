@@ -17,7 +17,7 @@ struct Cli {
     exit: Option<i32>,
 }
 
-fn prepare_logging() -> Result<(), Box<std::error::Error>> {
+fn prepare_logging() -> Result<(), Box<dyn std::error::Error>> {
     let mut log_file = std::env::current_exe()?;
     log_file.pop();
     log_file.push("shawl-child.log");
@@ -46,7 +46,7 @@ fn prepare_logging() -> Result<(), Box<std::error::Error>> {
     Ok(())
 }
 
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     prepare_logging()?;
     info!("********** LAUNCH **********");
     let cli = Cli::from_args();
