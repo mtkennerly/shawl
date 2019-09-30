@@ -110,39 +110,7 @@ fn prepare_logging(console: bool) -> Result<(), Box<std::error::Error>> {
 
 fn add_service(name: String, opts: CommonOpts) -> Result<(), ()> {
     let shawl_path = std::env::current_exe().expect("Unable to determine Shawl location");
-    let mut shawl_args = vec![
-        "run".to_string(),
-        "--name".to_string(),
-        name.clone(),
-        "--stop-timeout".to_string(),
-        opts.stop_timeout.to_string(),
-    ];
-    if opts.restart {
-        shawl_args.push("--restart".to_string());
-    }
-    if opts.no_restart {
-        shawl_args.push("--no-restart".to_string());
-    }
-    if !opts.restart_if.is_empty() {
-        shawl_args.push("--restart-if".to_string());
-        shawl_args.push(
-            opts.restart_if
-                .iter()
-                .map(|x| x.to_string())
-                .collect::<Vec<String>>()
-                .join(","),
-        );
-    }
-    if !opts.restart_if_not.is_empty() {
-        shawl_args.push("--restart-if-not".to_string());
-        shawl_args.push(
-            opts.restart_if_not
-                .iter()
-                .map(|x| x.to_string())
-                .collect::<Vec<String>>()
-                .join(","),
-        );
-    }
+    let shawl_args = construct_shawl_run_args(&name, &opts);
 
     let output = std::process::Command::new("sc")
         .arg("create")
@@ -191,6 +159,53 @@ fn should_restart_exited_command(
 
 fn should_restart_terminated_command(restart: bool, _no_restart: bool) -> bool {
     restart
+}
+
+fn construct_shawl_run_args(name: &String, opts: &CommonOpts) -> Vec<String> {
+    let mut shawl_args = vec![
+        "run".to_string(),
+        "--name".to_string(),
+        name.clone(),
+        "--stop-timeout".to_string(),
+        opts.stop_timeout.to_string(),
+    ];
+    if opts.restart {
+        shawl_args.push("--restart".to_string());
+    }
+    if opts.no_restart {
+        shawl_args.push("--no-restart".to_string());
+    }
+    if !opts.restart_if.is_empty() {
+        shawl_args.push("--restart-if".to_string());
+        shawl_args.push(
+            opts.restart_if
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>()
+                .join(","),
+        );
+    }
+    if !opts.restart_if_not.is_empty() {
+        shawl_args.push("--restart-if-not".to_string());
+        shawl_args.push(
+            opts.restart_if_not
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>()
+                .join(","),
+        );
+    };
+    if !opts.pass.is_empty() {
+        shawl_args.push("--pass".to_string());
+        shawl_args.push(
+            opts.pass
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>()
+                .join(","),
+        );
+    }
+    shawl_args
 }
 
 #[cfg(windows)]
@@ -835,6 +850,170 @@ speculate::speculate! {
             assert!(!should_restart_terminated_command(false, false));
             assert!(should_restart_terminated_command(true, false));
             assert!(!should_restart_terminated_command(false, true));
+        }
+    }
+
+    describe "construct_shawl_run_args" {
+        it "works with minimal input" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &CommonOpts {
+                        pass: vec![],
+                        restart: false,
+                        no_restart: false,
+                        restart_if: vec![],
+                        restart_if_not: vec![],
+                        stop_timeout: 3000,
+                        command: vec![s("foo")],
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--stop-timeout", "3000"],
+            );
+        }
+
+        it "handles --restart" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &CommonOpts {
+                        pass: vec![],
+                        restart: true,
+                        no_restart: false,
+                        restart_if: vec![],
+                        restart_if_not: vec![],
+                        stop_timeout: 3000,
+                        command: vec![s("foo")],
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--stop-timeout", "3000", "--restart"],
+            );
+        }
+
+        it "handles --no-restart" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &CommonOpts {
+                        pass: vec![],
+                        restart: false,
+                        no_restart: true,
+                        restart_if: vec![],
+                        restart_if_not: vec![],
+                        stop_timeout: 3000,
+                        command: vec![s("foo")],
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--stop-timeout", "3000", "--no-restart"],
+            );
+        }
+
+        it "handles --restart-if with one code" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &CommonOpts {
+                        pass: vec![],
+                        restart: false,
+                        no_restart: false,
+                        restart_if: vec![0],
+                        restart_if_not: vec![],
+                        stop_timeout: 3000,
+                        command: vec![s("foo")],
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--stop-timeout", "3000", "--restart-if", "0"],
+            );
+        }
+
+        it "handles --restart-if with multiple codes" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &CommonOpts {
+                        pass: vec![],
+                        restart: false,
+                        no_restart: false,
+                        restart_if: vec![1, 10],
+                        restart_if_not: vec![],
+                        stop_timeout: 3000,
+                        command: vec![s("foo")],
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--stop-timeout", "3000", "--restart-if", "1,10"],
+            );
+        }
+
+        it "handles --restart-if-not with one code" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &CommonOpts {
+                        pass: vec![],
+                        restart: false,
+                        no_restart: false,
+                        restart_if: vec![],
+                        restart_if_not: vec![0],
+                        stop_timeout: 3000,
+                        command: vec![s("foo")],
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--stop-timeout", "3000", "--restart-if-not", "0"],
+            );
+        }
+
+        it "handles --restart-if-not with multiple codes" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &CommonOpts {
+                        pass: vec![],
+                        restart: false,
+                        no_restart: false,
+                        restart_if: vec![],
+                        restart_if_not: vec![1, 10],
+                        stop_timeout: 3000,
+                        command: vec![s("foo")],
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--stop-timeout", "3000", "--restart-if-not", "1,10"],
+            );
+        }
+
+        it "handles --pass with one code" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &CommonOpts {
+                        pass: vec![0],
+                        restart: false,
+                        no_restart: false,
+                        restart_if: vec![],
+                        restart_if_not: vec![],
+                        stop_timeout: 3000,
+                        command: vec![s("foo")],
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--stop-timeout", "3000", "--pass", "0"],
+            );
+        }
+
+        it "handles --pass with multiple codes" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &CommonOpts {
+                        pass: vec![1, 10],
+                        restart: false,
+                        no_restart: false,
+                        restart_if: vec![],
+                        restart_if_not: vec![],
+                        stop_timeout: 3000,
+                        command: vec![s("foo")],
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--stop-timeout", "3000", "--pass", "1,10"],
+            );
         }
     }
 }

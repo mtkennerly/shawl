@@ -1,14 +1,22 @@
 # Shawl
 
-Shawl is a service wrapper for Windows programs, written in Rust. You can
-bundle Shawl with your project, set it as the entry point of the service, and
-simply pass the command for it to run via CLI, without your program needing to
-be service-aware. Shawl's own options and your command are separated by `--`:
+Shawl is a wrapper for running arbitrary programs as Windows services,
+written in Rust. It handles the Windows service API for you so that your
+program only needs to respond to ctrl-C/SIGINT. If you're creating a project
+that needs to run as a service, simply bundle Shawl with your project, set it
+as the entry point, and pass the command to run via CLI. Here is an example of
+creating a service wrapped with Shawl (note that `--` separates Shawl's own
+options from the command that you'd like it to run):
 
-```
-shawl run -- C:/path/my-app.exe --foo bar
-shawl run --restart-if 0,10 --stop-timeout 5000 -- C:/path/my-app.exe
-```
+* Using Shawl's `add` command:
+  * `shawl add --name my-app -- C:/path/my-app.exe`
+* Using the Windows `sc` command for more control:
+  * `sc create my-app binPath= "C:/path/shawl.exe run -- C:/path/my-app.exe"`
+* Then start or configure the service as normal:
+  * ```
+    sc config my-app start= auto
+    sc start my-app
+    ```
 
 Shawl will inspect the state of your program in order to report the correct
 status to Windows:
@@ -21,21 +29,15 @@ status to Windows:
   forcibly killing the process if necessary.
 * In either case, if Shawl is not restarting your program, then it reports
   the exit code to Windows as a service-specific error, unless the exit code
-  is 0 or one defined with `--pass`.
+  is 0 or a code you've configured with `--pass`.
 
 Shawl differs from existing solutions like [WinSW](https://github.com/kohsuke/winsw)
-and [NSSM](https://nssm.cc) in that their interfaces rely on running a special
-install command to prepare the service, which means, for example, that you have
-to run a `CustomAction` if you're installing with an MSI. With Shawl, you can
+and [NSSM](https://nssm.cc) in that they require running a special install
+command to prepare the service, which means, for example, that you have to run
+a `CustomAction` if you need to install a service in an MSI. With Shawl, you can
 configure the service however you want, such as with the normal `ServiceInstall`
 in an MSI or by running `sc create`, because Shawl doesn't have any special
-setup of its own. That said, Shawl does provide a `shawl add` command to
-quickly create a wrapped service if you prefer to do it that way:
-
-```
-shawl add --name my-app --restart-ok -- C:/path/my-app.exe
-sc start my-app
-```
+setup of its own. The `shawl add` command is just an optional convenience.
 
 ## Installation
 * Prebuilt binaries are available on the
@@ -66,20 +68,11 @@ SUBCOMMANDS:
 
 ## Development
 
-Commands assume you are using [Git Bash](https://git-scm.com) on Windows:
-
+* Run tests (avoid concurrency since the integration tests make real services):
+  * `cargo test -- --test-threads 1`
 * Add targets:
   * 32-bit: `rustup target add i686-pc-windows-msvc`
   * 64-bit: `rustup target add x86_64-pc-windows-msvc`
-* Build:
+* Build for release:
   * 32-bit: `cargo build --release --target i686-pc-windows-msvc`
   * 64-bit: `cargo build --release --target x86_64-pc-windows-msvc`
-* Test as a service:
-  * Create: `sc create shawl binPath= "$(readlink -f ./target/debug/shawl.exe) -- $(readlink -f ./target/debug/shawl-child.exe | cut -c 3-)"`
-    * Or via Shawl itself: `cargo run --bin shawl -- add --name shawl -- $(readlink -f ./target/debug/shawl-child.exe)`
-    * Pass `--infinite` to the child to force a timeout on stop.
-    * Pass `--exit 123` to the child to exit with that code.
-  * Inspect: `sc qc shawl`
-  * Start: `sc start shawl`
-  * Stop: `sc stop shawl`
-  * Delete: `sc delete shawl`
