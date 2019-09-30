@@ -1,4 +1,4 @@
-## Unreleased
+## v0.3.0 (2019-09-30)
 
 * Added `shawl add` for quickly creating a Shawl-wrapped service.
 * Moved existing CLI functionality under `shawl run`.
