@@ -87,6 +87,6 @@ Commands assume you are using [Git Bash](https://git-scm.com) on Windows:
   cargo build --release --target x86_64-pc-windows-msvc
   cp target/i686-pc-windows-msvc/release/shawl.exe dist/shawl-v$VERSION-win32.exe
   cp target/x86_64-pc-windows-msvc/release/shawl.exe dist/shawl-v$VERSION-win64.exe
-  cargo lichking bundle --file dist/shawl-v$VERSION-licenses.txt
-  sed -i -E 's/\\\\\?\\C:\\Users\\[^\\]+/~/g' dist/shawl-v$VERSION-licenses.txt
+  cargo lichking bundle --file dist/shawl-v$VERSION-legal.txt
+  sed -i -E 's/\\\\\?\\C:\\Users\\[^\\]+/~/g' dist/shawl-v$VERSION-legal.txt
   ```
