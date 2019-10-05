@@ -63,7 +63,8 @@ FLAGS:
 SUBCOMMANDS:
     add     Add a new service
     help    Prints this message or the help of the given subcommand(s)
-    run     Run a command as a service; only works when launched by the Windows service manager
+    run     Run a command as a service; only works when launched by the
+            Windows service manager
 ```
 
 ## Development

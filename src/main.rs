@@ -2,6 +2,10 @@ use log::{debug, error};
 use std::io::Write;
 use structopt::StructOpt;
 
+fn parse_canonical_path(path: &str) -> Result<String, std::io::Error> {
+    Ok(std::fs::canonicalize(path)?.to_string_lossy().to_string())
+}
+
 #[derive(structopt::StructOpt, Debug, PartialEq)]
 struct CommonOpts {
     /// Exit codes that should be considered successful (comma-separated)
@@ -46,6 +50,11 @@ enum Subcommand {
         #[structopt(flatten)]
         common: CommonOpts,
 
+        /// Working directory in which to run the command. You may provide a
+        /// relative path, and it will be converted to an absolute one
+        #[structopt(long, value_name = "path", parse(try_from_str = parse_canonical_path))]
+        cwd: Option<String>,
+
         /// Name of the service to create
         #[structopt(long)]
         name: String,
@@ -57,6 +66,10 @@ enum Subcommand {
         #[structopt(flatten)]
         common: CommonOpts,
 
+        /// Working directory in which to run the command. Must be an absolute path
+        #[structopt(long, value_name = "path")]
+        cwd: Option<String>,
+
         /// Name of the service; used in logging, but does not need to match real name
         #[structopt(long, default_value = "Shawl")]
         name: String,
@@ -67,6 +80,7 @@ enum Subcommand {
 #[structopt(
     name = "shawl",
     about = "Wrap arbitrary commands as Windows services",
+    set_term_width = 80,
     setting(structopt::clap::AppSettings::SubcommandsNegateReqs)
 )]
 struct Cli {
@@ -108,9 +122,10 @@ fn prepare_logging(console: bool) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn add_service(name: String, opts: CommonOpts) -> Result<(), ()> {
+fn add_service(name: String, cwd: Option<String>, opts: CommonOpts) -> Result<(), ()> {
     let shawl_path = std::env::current_exe().expect("Unable to determine Shawl location");
-    let shawl_args = construct_shawl_run_args(&name, &opts);
+    let shawl_args = construct_shawl_run_args(&name, &cwd, &opts);
+    let prepared_command = prepare_command(&opts.command);
 
     let output = std::process::Command::new("sc")
         .arg("create")
@@ -120,7 +135,7 @@ fn add_service(name: String, opts: CommonOpts) -> Result<(), ()> {
             "{} {} -- {}",
             shawl_path.display(),
             shawl_args.join(" "),
-            opts.command.join(" ")
+            prepared_command.join(" ")
         ))
         .output()
         .expect("Failed to create the service");
@@ -161,11 +176,11 @@ fn should_restart_terminated_command(restart: bool, _no_restart: bool) -> bool {
     restart
 }
 
-fn construct_shawl_run_args(name: &String, opts: &CommonOpts) -> Vec<String> {
+fn construct_shawl_run_args(name: &String, cwd: &Option<String>, opts: &CommonOpts) -> Vec<String> {
     let mut shawl_args = vec![
         "run".to_string(),
         "--name".to_string(),
-        name.clone(),
+        quote(name),
         "--stop-timeout".to_string(),
         opts.stop_timeout.to_string(),
     ];
@@ -205,7 +220,23 @@ fn construct_shawl_run_args(name: &String, opts: &CommonOpts) -> Vec<String> {
                 .join(","),
         );
     }
+    if let Some(cwd) = &cwd {
+        shawl_args.push("--cwd".to_string());
+        shawl_args.push(quote(&cwd));
+    };
     shawl_args
+}
+
+fn prepare_command(command: &Vec<String>) -> Vec<String> {
+    command.iter().map(|x| quote(x)).collect::<Vec<String>>()
+}
+
+fn quote(text: &String) -> String {
+    if text.contains(" ") {
+        format!("\"{}\"", text).to_string()
+    } else {
+        text.clone()
+    }
 }
 
 #[cfg(windows)]
@@ -221,7 +252,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     debug!("{:?}", cli);
 
     match cli.sub {
-        Subcommand::Add { name, common: opts } => match add_service(name, opts) {
+        Subcommand::Add { name, cwd, common: opts } => match add_service(name, cwd, opts) {
             Ok(_) => (),
             Err(_) => std::process::exit(1),
         },
@@ -304,8 +335,8 @@ mod service {
     pub fn run_service() -> windows_service::Result<()> {
         let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
         let cli = crate::Cli::from_args();
-        let (name, opts) = match cli.sub {
-            crate::Subcommand::Run { name, common: opts } => (name, opts),
+        let (name, cwd, opts) = match cli.sub {
+            crate::Subcommand::Run { name, cwd, common: opts } => (name, cwd, opts),
             _ => {
                 // Can't get here.
                 return Ok(());
@@ -348,12 +379,23 @@ mod service {
         debug!("Entering main service loop");
         'outer: loop {
             info!("Launching command");
-            let mut child = match std::process::Command::new(&opts.command[0])
-                .args(&opts.command[1..])
-                .spawn()
-            {
+            let mut child_cmd = std::process::Command::new(&opts.command[0]);
+            child_cmd.args(&opts.command[1..]);
+            if let Some(active_cwd) = &cwd {
+                child_cmd.current_dir(active_cwd);
+            }
+            let mut child = match child_cmd.spawn() {
                 Ok(c) => c,
-                Err(_) => break,
+                Err(e) => {
+                    error!("Unable to launch command: {}", e);
+                    service_exit_code = match e.raw_os_error() {
+                        Some(win_code) => ServiceExitCode::Win32(win_code as u32),
+                        None => {
+                            ServiceExitCode::Win32(winapi::shared::winerror::ERROR_PROCESS_ABORTED)
+                        }
+                    };
+                    break;
+                }
             };
 
             'inner: loop {
@@ -503,6 +545,7 @@ speculate::speculate! {
                     Cli {
                         sub: Subcommand::Run {
                             name: s("Shawl"),
+                            cwd: None,
                             common: CommonOpts {
                                 pass: vec![0],
                                 restart: false,
@@ -530,6 +573,7 @@ speculate::speculate! {
                     Cli {
                         sub: Subcommand::Run {
                             name: s("Shawl"),
+                            cwd: None,
                             common: CommonOpts {
                                 pass: vec![1, 2],
                                 restart: false,
@@ -550,6 +594,7 @@ speculate::speculate! {
                     Cli {
                         sub: Subcommand::Run {
                             name: s("Shawl"),
+                            cwd: None,
                             common: CommonOpts {
                                 pass: vec![0],
                                 restart: true,
@@ -570,6 +615,7 @@ speculate::speculate! {
                     Cli {
                         sub: Subcommand::Run {
                             name: s("Shawl"),
+                            cwd: None,
                             common: CommonOpts {
                                 pass: vec![0],
                                 restart: false,
@@ -590,6 +636,7 @@ speculate::speculate! {
                     Cli {
                         sub: Subcommand::Run {
                             name: s("Shawl"),
+                            cwd: None,
                             common: CommonOpts {
                                 pass: vec![0],
                                 restart: false,
@@ -610,6 +657,7 @@ speculate::speculate! {
                     Cli {
                         sub: Subcommand::Run {
                             name: s("Shawl"),
+                            cwd: None,
                             common: CommonOpts {
                                 pass: vec![0],
                                 restart: false,
@@ -630,6 +678,7 @@ speculate::speculate! {
                     Cli {
                         sub: Subcommand::Run {
                             name: s("Shawl"),
+                            cwd: None,
                             common: CommonOpts {
                                 pass: vec![0],
                                 restart: false,
@@ -650,6 +699,7 @@ speculate::speculate! {
                     Cli {
                         sub: Subcommand::Run {
                             name: s("custom-name"),
+                            cwd: None,
                             common: CommonOpts {
                                 pass: vec![0],
                                 restart: false,
@@ -672,6 +722,7 @@ speculate::speculate! {
                     Cli {
                         sub: Subcommand::Add {
                             name: s("custom-name"),
+                            cwd: None,
                             common: CommonOpts {
                                 pass: vec![0],
                                 restart: false,
@@ -706,6 +757,7 @@ speculate::speculate! {
                     Cli {
                         sub: Subcommand::Add {
                             name: s("foo"),
+                            cwd: None,
                             common: CommonOpts {
                                 pass: vec![1, 2],
                                 restart: false,
@@ -726,6 +778,7 @@ speculate::speculate! {
                     Cli {
                         sub: Subcommand::Add {
                             name: s("foo"),
+                            cwd: None,
                             common: CommonOpts {
                                 pass: vec![0],
                                 restart: true,
@@ -746,6 +799,7 @@ speculate::speculate! {
                     Cli {
                         sub: Subcommand::Add {
                             name: s("foo"),
+                            cwd: None,
                             common: CommonOpts {
                                 pass: vec![0],
                                 restart: false,
@@ -766,6 +820,7 @@ speculate::speculate! {
                     Cli {
                         sub: Subcommand::Add {
                             name: s("foo"),
+                            cwd: None,
                             common: CommonOpts {
                                 pass: vec![0],
                                 restart: false,
@@ -786,6 +841,7 @@ speculate::speculate! {
                     Cli {
                         sub: Subcommand::Add {
                             name: s("foo"),
+                            cwd: None,
                             common: CommonOpts {
                                 pass: vec![0],
                                 restart: false,
@@ -806,6 +862,7 @@ speculate::speculate! {
                     Cli {
                         sub: Subcommand::Add {
                             name: s("foo"),
+                            cwd: None,
                             common: CommonOpts {
                                 pass: vec![0],
                                 restart: false,
@@ -860,6 +917,7 @@ speculate::speculate! {
             assert_eq!(
                 construct_shawl_run_args(
                     &s("shawl"),
+                    &None,
                     &CommonOpts {
                         pass: vec![],
                         restart: false,
@@ -874,10 +932,30 @@ speculate::speculate! {
             );
         }
 
+        it "handles --name with spaces" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("C:/Program Files/shawl"),
+                    &None,
+                    &CommonOpts {
+                        pass: vec![],
+                        restart: false,
+                        no_restart: false,
+                        restart_if: vec![],
+                        restart_if_not: vec![],
+                        stop_timeout: 3000,
+                        command: vec![s("foo")],
+                    }
+                ),
+                vec!["run", "--name", "\"C:/Program Files/shawl\"", "--stop-timeout", "3000"],
+            );
+        }
+
         it "handles --restart" {
             assert_eq!(
                 construct_shawl_run_args(
                     &s("shawl"),
+                    &None,
                     &CommonOpts {
                         pass: vec![],
                         restart: true,
@@ -896,6 +974,7 @@ speculate::speculate! {
             assert_eq!(
                 construct_shawl_run_args(
                     &s("shawl"),
+                    &None,
                     &CommonOpts {
                         pass: vec![],
                         restart: false,
@@ -914,6 +993,7 @@ speculate::speculate! {
             assert_eq!(
                 construct_shawl_run_args(
                     &s("shawl"),
+                    &None,
                     &CommonOpts {
                         pass: vec![],
                         restart: false,
@@ -932,6 +1012,7 @@ speculate::speculate! {
             assert_eq!(
                 construct_shawl_run_args(
                     &s("shawl"),
+                    &None,
                     &CommonOpts {
                         pass: vec![],
                         restart: false,
@@ -950,6 +1031,7 @@ speculate::speculate! {
             assert_eq!(
                 construct_shawl_run_args(
                     &s("shawl"),
+                    &None,
                     &CommonOpts {
                         pass: vec![],
                         restart: false,
@@ -968,6 +1050,7 @@ speculate::speculate! {
             assert_eq!(
                 construct_shawl_run_args(
                     &s("shawl"),
+                    &None,
                     &CommonOpts {
                         pass: vec![],
                         restart: false,
@@ -986,6 +1069,7 @@ speculate::speculate! {
             assert_eq!(
                 construct_shawl_run_args(
                     &s("shawl"),
+                    &None,
                     &CommonOpts {
                         pass: vec![0],
                         restart: false,
@@ -1004,6 +1088,7 @@ speculate::speculate! {
             assert_eq!(
                 construct_shawl_run_args(
                     &s("shawl"),
+                    &None,
                     &CommonOpts {
                         pass: vec![1, 10],
                         restart: false,
@@ -1015,6 +1100,60 @@ speculate::speculate! {
                     }
                 ),
                 vec!["run", "--name", "shawl", "--stop-timeout", "3000", "--pass", "1,10"],
+            );
+        }
+
+        it "handles --cwd without spaces" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &Some(s("C:/foo")),
+                    &CommonOpts {
+                        pass: vec![0],
+                        restart: false,
+                        no_restart: false,
+                        restart_if: vec![],
+                        restart_if_not: vec![],
+                        stop_timeout: 3000,
+                        command: vec![s("foo")],
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--stop-timeout", "3000", "--pass", "0", "--cwd", "C:/foo"],
+            );
+        }
+
+        it "handles --cwd with spaces" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &Some(s("C:/Program Files/foo")),
+                    &CommonOpts {
+                        pass: vec![0],
+                        restart: false,
+                        no_restart: false,
+                        restart_if: vec![],
+                        restart_if_not: vec![],
+                        stop_timeout: 3000,
+                        command: vec![s("foo")],
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--stop-timeout", "3000", "--pass", "0", "--cwd", "\"C:/Program Files/foo\""],
+            );
+        }
+    }
+
+    describe "prepare_command" {
+        it "handles commands without inner spaces" {
+            assert_eq!(
+                prepare_command(&vec![s("cat"), s("file")]),
+                vec![s("cat"), s("file")],
+            );
+        }
+
+        it "handles commands with inner spaces" {
+            assert_eq!(
+                prepare_command(&vec![s("cat"), s("some file")]),
+                vec![s("cat"), s("\"some file\"")],
             );
         }
     }

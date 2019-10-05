@@ -1,3 +1,12 @@
+## Unreleased
+
+* Added `--cwd` for setting the command's working directory.
+* Fixed issue where Shawl would not report an error if it was unable to
+  launch the command (e.g., file not found).
+* Fixed missing quotes when adding a service if the name or any part of
+  the command contained spaces.
+* Set default help text width to 80 characters.
+
 ## v0.3.0 (2019-09-30)
 
 * Added `shawl add` for quickly creating a Shawl-wrapped service.
