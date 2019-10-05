@@ -39,6 +39,12 @@ configure the service however you want, such as with the normal `ServiceInstall`
 in an MSI or by running `sc create`, because Shawl doesn't have any special
 setup of its own. The `shawl add` command is just an optional convenience.
 
+Bear in mind that the default account for new services is the Local System
+account, which has a different `PATH` environment variable than your user
+account. If you configure Shawl to run a command like `npm start`, that means
+`npm` needs to be in the Local System account's `PATH`, or you could also
+change the account used by the service instead.
+
 ## Installation
 * Prebuilt binaries are available on the
   [releases page](https://github.com/mtkennerly/shawl/releases).
