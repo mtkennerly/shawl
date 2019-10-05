@@ -43,9 +43,14 @@ speculate::speculate! {
 
             let sc_output = run_cmd(&["sc", "qc", "shawl"]);
             let pattern = regex::Regex::new(
-                r"BINARY_PATH_NAME *: .+shawl\.exe run --name shawl --stop-timeout 3000 --pass 0 -- .+shawl-child\.exe"
+                r"BINARY_PATH_NAME *: .+shawl\.exe run --name shawl -- .+shawl-child\.exe"
             ).unwrap();
             assert!(pattern.is_match(&String::from_utf8_lossy(&sc_output.stdout)));
+        }
+
+        it "rejects nonexistent --cwd path" {
+            let shawl_output = run_shawl(&["add", "--name", "shawl", "--cwd", "shawl-fake", "--", &child()]);
+            assert_eq!(shawl_output.status.code(), Some(1));
         }
     }
 

@@ -8,9 +8,9 @@ fn parse_canonical_path(path: &str) -> Result<String, std::io::Error> {
 
 #[derive(structopt::StructOpt, Debug, PartialEq)]
 struct CommonOpts {
-    /// Exit codes that should be considered successful (comma-separated)
-    #[structopt(long, value_name = "codes", default_value = "0", use_delimiter(true))]
-    pass: Vec<i32>,
+    /// Exit codes that should be considered successful (comma-separated) [default: 0]
+    #[structopt(long, value_name = "codes", use_delimiter(true))]
+    pass: Option<Vec<i32>>,
 
     /// Always restart the command regardless of the exit code
     #[structopt(
@@ -34,9 +34,9 @@ struct CommonOpts {
     restart_if_not: Vec<i32>,
 
     /// How long to wait in milliseconds between sending the wrapped process
-    /// a ctrl-C event and forcibly killing it
-    #[structopt(long, default_value = "3000", value_name = "ms")]
-    stop_timeout: u64,
+    /// a ctrl-C event and forcibly killing it [default: 3000]
+    #[structopt(long, value_name = "ms")]
+    stop_timeout: Option<u64>,
 
     /// Command to run as a service
     #[structopt(required(true), last(true))]
@@ -181,9 +181,11 @@ fn construct_shawl_run_args(name: &String, cwd: &Option<String>, opts: &CommonOp
         "run".to_string(),
         "--name".to_string(),
         quote(name),
-        "--stop-timeout".to_string(),
-        opts.stop_timeout.to_string(),
     ];
+    if let Some(st) = opts.stop_timeout {
+        shawl_args.push("--stop-timeout".to_string());
+        shawl_args.push(st.to_string());
+    }
     if opts.restart {
         shawl_args.push("--restart".to_string());
     }
@@ -210,10 +212,10 @@ fn construct_shawl_run_args(name: &String, cwd: &Option<String>, opts: &CommonOp
                 .join(","),
         );
     };
-    if !opts.pass.is_empty() {
+    if let Some(pass) = &opts.pass {
         shawl_args.push("--pass".to_string());
         shawl_args.push(
-            opts.pass
+            pass
                 .iter()
                 .map(|x| x.to_string())
                 .collect::<Vec<String>>()
@@ -342,6 +344,8 @@ mod service {
                 return Ok(());
             }
         };
+        let pass = &opts.pass.unwrap_or(vec![0]);
+        let stop_timeout = &opts.stop_timeout.unwrap_or(3000u64);
         let mut service_exit_code = ServiceExitCode::NO_ERROR;
 
         let ignore_ctrlc = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -407,7 +411,7 @@ mod service {
                             controls_accepted: ServiceControlAccept::empty(),
                             exit_code: ServiceExitCode::NO_ERROR,
                             checkpoint: 0,
-                            wait_hint: std::time::Duration::from_millis(opts.stop_timeout + 1000),
+                            wait_hint: std::time::Duration::from_millis(opts.stop_timeout.unwrap_or(3000) + 1000),
                         })?;
 
                         ignore_ctrlc.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -429,7 +433,7 @@ mod service {
                         loop {
                             match crate::check_process(&mut child) {
                                 Ok(crate::ProcessStatus::Running) => {
-                                    if start_time.elapsed().as_millis() < opts.stop_timeout.into() {
+                                    if start_time.elapsed().as_millis() < (*stop_timeout).into() {
                                         std::thread::sleep(std::time::Duration::from_millis(50))
                                     } else {
                                         info!("Killing command because stop timeout expired");
@@ -444,7 +448,7 @@ mod service {
                                         start_time.elapsed().as_millis(),
                                         code
                                     );
-                                    service_exit_code = match opts.pass.contains(&code) {
+                                    service_exit_code = match pass.contains(&code) {
                                         true => ServiceExitCode::NO_ERROR,
                                         false => ServiceExitCode::ServiceSpecific(code as u32),
                                     };
@@ -467,7 +471,7 @@ mod service {
                     Ok(crate::ProcessStatus::Running) => (),
                     Ok(crate::ProcessStatus::Exited(code)) => {
                         info!("Command exited with code {:?}", code);
-                        service_exit_code = match opts.pass.contains(&code) {
+                        service_exit_code = match pass.contains(&code) {
                             true => ServiceExitCode::NO_ERROR,
                             false => ServiceExitCode::ServiceSpecific(code as u32),
                         };
@@ -547,12 +551,12 @@ speculate::speculate! {
                             name: s("Shawl"),
                             cwd: None,
                             common: CommonOpts {
-                                pass: vec![0],
+                                pass: None,
                                 restart: false,
                                 no_restart: false,
                                 restart_if: vec![],
                                 restart_if_not: vec![],
-                                stop_timeout: 3000,
+                                stop_timeout: None,
                                 command: vec![s("foo")],
                             }
                         }
@@ -575,12 +579,12 @@ speculate::speculate! {
                             name: s("Shawl"),
                             cwd: None,
                             common: CommonOpts {
-                                pass: vec![1, 2],
+                                pass: Some(vec![1, 2]),
                                 restart: false,
                                 no_restart: false,
                                 restart_if: vec![],
                                 restart_if_not: vec![],
-                                stop_timeout: 3000,
+                                stop_timeout: None,
                                 command: vec![s("foo")],
                             }
                         }
@@ -596,12 +600,12 @@ speculate::speculate! {
                             name: s("Shawl"),
                             cwd: None,
                             common: CommonOpts {
-                                pass: vec![0],
+                                pass: None,
                                 restart: true,
                                 no_restart: false,
                                 restart_if: vec![],
                                 restart_if_not: vec![],
-                                stop_timeout: 3000,
+                                stop_timeout: None,
                                 command: vec![s("foo")],
                             }
                         }
@@ -617,12 +621,12 @@ speculate::speculate! {
                             name: s("Shawl"),
                             cwd: None,
                             common: CommonOpts {
-                                pass: vec![0],
+                                pass: None,
                                 restart: false,
                                 no_restart: true,
                                 restart_if: vec![],
                                 restart_if_not: vec![],
-                                stop_timeout: 3000,
+                                stop_timeout: None,
                                 command: vec![s("foo")],
                             }
                         }
@@ -638,12 +642,12 @@ speculate::speculate! {
                             name: s("Shawl"),
                             cwd: None,
                             common: CommonOpts {
-                                pass: vec![0],
+                                pass: None,
                                 restart: false,
                                 no_restart: false,
                                 restart_if: vec![1, 2],
                                 restart_if_not: vec![],
-                                stop_timeout: 3000,
+                                stop_timeout: None,
                                 command: vec![s("foo")],
                             }
                         }
@@ -659,12 +663,12 @@ speculate::speculate! {
                             name: s("Shawl"),
                             cwd: None,
                             common: CommonOpts {
-                                pass: vec![0],
+                                pass: None,
                                 restart: false,
                                 no_restart: false,
                                 restart_if: vec![],
                                 restart_if_not: vec![1, 2],
-                                stop_timeout: 3000,
+                                stop_timeout: None,
                                 command: vec![s("foo")],
                             }
                         }
@@ -680,12 +684,12 @@ speculate::speculate! {
                             name: s("Shawl"),
                             cwd: None,
                             common: CommonOpts {
-                                pass: vec![0],
+                                pass: None,
                                 restart: false,
                                 no_restart: false,
                                 restart_if: vec![],
                                 restart_if_not: vec![],
-                                stop_timeout: 500,
+                                stop_timeout: Some(500),
                                 command: vec![s("foo")],
                             }
                         }
@@ -701,12 +705,12 @@ speculate::speculate! {
                             name: s("custom-name"),
                             cwd: None,
                             common: CommonOpts {
-                                pass: vec![0],
+                                pass: None,
                                 restart: false,
                                 no_restart: false,
                                 restart_if: vec![],
                                 restart_if_not: vec![],
-                                stop_timeout: 3000,
+                                stop_timeout: None,
                                 command: vec![s("foo")],
                             }
                         }
@@ -724,12 +728,12 @@ speculate::speculate! {
                             name: s("custom-name"),
                             cwd: None,
                             common: CommonOpts {
-                                pass: vec![0],
+                                pass: None,
                                 restart: false,
                                 no_restart: false,
                                 restart_if: vec![],
                                 restart_if_not: vec![],
-                                stop_timeout: 3000,
+                                stop_timeout: None,
                                 command: vec![s("foo")],
                             }
                         }
@@ -759,12 +763,12 @@ speculate::speculate! {
                             name: s("foo"),
                             cwd: None,
                             common: CommonOpts {
-                                pass: vec![1, 2],
+                                pass: Some(vec![1, 2]),
                                 restart: false,
                                 no_restart: false,
                                 restart_if: vec![],
                                 restart_if_not: vec![],
-                                stop_timeout: 3000,
+                                stop_timeout: None,
                                 command: vec![s("foo")],
                             }
                         }
@@ -780,12 +784,12 @@ speculate::speculate! {
                             name: s("foo"),
                             cwd: None,
                             common: CommonOpts {
-                                pass: vec![0],
+                                pass: None,
                                 restart: true,
                                 no_restart: false,
                                 restart_if: vec![],
                                 restart_if_not: vec![],
-                                stop_timeout: 3000,
+                                stop_timeout: None,
                                 command: vec![s("foo")],
                             }
                         }
@@ -801,12 +805,12 @@ speculate::speculate! {
                             name: s("foo"),
                             cwd: None,
                             common: CommonOpts {
-                                pass: vec![0],
+                                pass: None,
                                 restart: false,
                                 no_restart: true,
                                 restart_if: vec![],
                                 restart_if_not: vec![],
-                                stop_timeout: 3000,
+                                stop_timeout: None,
                                 command: vec![s("foo")],
                             }
                         }
@@ -822,12 +826,12 @@ speculate::speculate! {
                             name: s("foo"),
                             cwd: None,
                             common: CommonOpts {
-                                pass: vec![0],
+                                pass: None,
                                 restart: false,
                                 no_restart: false,
                                 restart_if: vec![1, 2],
                                 restart_if_not: vec![],
-                                stop_timeout: 3000,
+                                stop_timeout: None,
                                 command: vec![s("foo")],
                             }
                         }
@@ -843,12 +847,12 @@ speculate::speculate! {
                             name: s("foo"),
                             cwd: None,
                             common: CommonOpts {
-                                pass: vec![0],
+                                pass: None,
                                 restart: false,
                                 no_restart: false,
                                 restart_if: vec![],
                                 restart_if_not: vec![1, 2],
-                                stop_timeout: 3000,
+                                stop_timeout: None,
                                 command: vec![s("foo")],
                             }
                         }
@@ -864,12 +868,12 @@ speculate::speculate! {
                             name: s("foo"),
                             cwd: None,
                             common: CommonOpts {
-                                pass: vec![0],
+                                pass: None,
                                 restart: false,
                                 no_restart: false,
                                 restart_if: vec![],
                                 restart_if_not: vec![],
-                                stop_timeout: 500,
+                                stop_timeout: Some(500),
                                 command: vec![s("foo")],
                             }
                         }
@@ -919,16 +923,16 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: vec![],
+                        pass: None,
                         restart: false,
                         no_restart: false,
                         restart_if: vec![],
                         restart_if_not: vec![],
-                        stop_timeout: 3000,
+                        stop_timeout: None,
                         command: vec![s("foo")],
                     }
                 ),
-                vec!["run", "--name", "shawl", "--stop-timeout", "3000"],
+                vec!["run", "--name", "shawl"],
             );
         }
 
@@ -938,16 +942,16 @@ speculate::speculate! {
                     &s("C:/Program Files/shawl"),
                     &None,
                     &CommonOpts {
-                        pass: vec![],
+                        pass: None,
                         restart: false,
                         no_restart: false,
                         restart_if: vec![],
                         restart_if_not: vec![],
-                        stop_timeout: 3000,
+                        stop_timeout: None,
                         command: vec![s("foo")],
                     }
                 ),
-                vec!["run", "--name", "\"C:/Program Files/shawl\"", "--stop-timeout", "3000"],
+                vec!["run", "--name", "\"C:/Program Files/shawl\""],
             );
         }
 
@@ -957,16 +961,16 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: vec![],
+                        pass: None,
                         restart: true,
                         no_restart: false,
                         restart_if: vec![],
                         restart_if_not: vec![],
-                        stop_timeout: 3000,
+                        stop_timeout: None,
                         command: vec![s("foo")],
                     }
                 ),
-                vec!["run", "--name", "shawl", "--stop-timeout", "3000", "--restart"],
+                vec!["run", "--name", "shawl", "--restart"],
             );
         }
 
@@ -976,16 +980,16 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: vec![],
+                        pass: None,
                         restart: false,
                         no_restart: true,
                         restart_if: vec![],
                         restart_if_not: vec![],
-                        stop_timeout: 3000,
+                        stop_timeout: None,
                         command: vec![s("foo")],
                     }
                 ),
-                vec!["run", "--name", "shawl", "--stop-timeout", "3000", "--no-restart"],
+                vec!["run", "--name", "shawl", "--no-restart"],
             );
         }
 
@@ -995,16 +999,16 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: vec![],
+                        pass: None,
                         restart: false,
                         no_restart: false,
                         restart_if: vec![0],
                         restart_if_not: vec![],
-                        stop_timeout: 3000,
+                        stop_timeout: None,
                         command: vec![s("foo")],
                     }
                 ),
-                vec!["run", "--name", "shawl", "--stop-timeout", "3000", "--restart-if", "0"],
+                vec!["run", "--name", "shawl", "--restart-if", "0"],
             );
         }
 
@@ -1014,16 +1018,16 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: vec![],
+                        pass: None,
                         restart: false,
                         no_restart: false,
                         restart_if: vec![1, 10],
                         restart_if_not: vec![],
-                        stop_timeout: 3000,
+                        stop_timeout: None,
                         command: vec![s("foo")],
                     }
                 ),
-                vec!["run", "--name", "shawl", "--stop-timeout", "3000", "--restart-if", "1,10"],
+                vec!["run", "--name", "shawl", "--restart-if", "1,10"],
             );
         }
 
@@ -1033,16 +1037,16 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: vec![],
+                        pass: None,
                         restart: false,
                         no_restart: false,
                         restart_if: vec![],
                         restart_if_not: vec![0],
-                        stop_timeout: 3000,
+                        stop_timeout: None,
                         command: vec![s("foo")],
                     }
                 ),
-                vec!["run", "--name", "shawl", "--stop-timeout", "3000", "--restart-if-not", "0"],
+                vec!["run", "--name", "shawl", "--restart-if-not", "0"],
             );
         }
 
@@ -1052,16 +1056,16 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: vec![],
+                        pass: None,
                         restart: false,
                         no_restart: false,
                         restart_if: vec![],
                         restart_if_not: vec![1, 10],
-                        stop_timeout: 3000,
+                        stop_timeout: None,
                         command: vec![s("foo")],
                     }
                 ),
-                vec!["run", "--name", "shawl", "--stop-timeout", "3000", "--restart-if-not", "1,10"],
+                vec!["run", "--name", "shawl", "--restart-if-not", "1,10"],
             );
         }
 
@@ -1071,16 +1075,16 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: vec![0],
+                        pass: Some(vec![0]),
                         restart: false,
                         no_restart: false,
                         restart_if: vec![],
                         restart_if_not: vec![],
-                        stop_timeout: 3000,
+                        stop_timeout: None,
                         command: vec![s("foo")],
                     }
                 ),
-                vec!["run", "--name", "shawl", "--stop-timeout", "3000", "--pass", "0"],
+                vec!["run", "--name", "shawl", "--pass", "0"],
             );
         }
 
@@ -1090,16 +1094,35 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: vec![1, 10],
+                        pass: Some(vec![1, 10]),
                         restart: false,
                         no_restart: false,
                         restart_if: vec![],
                         restart_if_not: vec![],
-                        stop_timeout: 3000,
+                        stop_timeout: None,
                         command: vec![s("foo")],
                     }
                 ),
-                vec!["run", "--name", "shawl", "--stop-timeout", "3000", "--pass", "1,10"],
+                vec!["run", "--name", "shawl", "--pass", "1,10"],
+            );
+        }
+
+        it "handles --stop-timeout" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &None,
+                    &CommonOpts {
+                        pass: None,
+                        restart: false,
+                        no_restart: false,
+                        restart_if: vec![],
+                        restart_if_not: vec![],
+                        stop_timeout: Some(3000),
+                        command: vec![s("foo")],
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--stop-timeout", "3000"],
             );
         }
 
@@ -1109,16 +1132,16 @@ speculate::speculate! {
                     &s("shawl"),
                     &Some(s("C:/foo")),
                     &CommonOpts {
-                        pass: vec![0],
+                        pass: None,
                         restart: false,
                         no_restart: false,
                         restart_if: vec![],
                         restart_if_not: vec![],
-                        stop_timeout: 3000,
+                        stop_timeout: None,
                         command: vec![s("foo")],
                     }
                 ),
-                vec!["run", "--name", "shawl", "--stop-timeout", "3000", "--pass", "0", "--cwd", "C:/foo"],
+                vec!["run", "--name", "shawl", "--cwd", "C:/foo"],
             );
         }
 
@@ -1128,16 +1151,16 @@ speculate::speculate! {
                     &s("shawl"),
                     &Some(s("C:/Program Files/foo")),
                     &CommonOpts {
-                        pass: vec![0],
+                        pass: None,
                         restart: false,
                         no_restart: false,
                         restart_if: vec![],
                         restart_if_not: vec![],
-                        stop_timeout: 3000,
+                        stop_timeout: None,
                         command: vec![s("foo")],
                     }
                 ),
-                vec!["run", "--name", "shawl", "--stop-timeout", "3000", "--pass", "0", "--cwd", "\"C:/Program Files/foo\""],
+                vec!["run", "--name", "shawl", "--cwd", "\"C:/Program Files/foo\""],
             );
         }
     }
