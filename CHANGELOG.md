@@ -1,4 +1,4 @@
-## Unreleased
+## v0.4.0 (2019-10-05)
 
 * Added `--cwd` for setting the command's working directory.
 * Set default help text width to 80 characters.
