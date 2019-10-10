@@ -157,18 +157,18 @@ fn add_service(name: String, cwd: Option<String>, opts: CommonOpts) -> Result<()
 }
 
 fn should_restart_exited_command(
-    code: &i32,
+    code: i32,
     restart: bool,
     no_restart: bool,
-    restart_if: &Vec<i32>,
-    restart_if_not: &Vec<i32>,
+    restart_if: &[i32],
+    restart_if_not: &[i32],
 ) -> bool {
     if !restart_if.is_empty() {
-        restart_if.contains(code)
+        restart_if.contains(&code)
     } else if !restart_if_not.is_empty() {
-        !restart_if_not.contains(code)
+        !restart_if_not.contains(&code)
     } else {
-        restart || !no_restart && *code != 0
+        restart || !no_restart && code != 0
     }
 }
 
@@ -176,12 +176,8 @@ fn should_restart_terminated_command(restart: bool, _no_restart: bool) -> bool {
     restart
 }
 
-fn construct_shawl_run_args(name: &String, cwd: &Option<String>, opts: &CommonOpts) -> Vec<String> {
-    let mut shawl_args = vec![
-        "run".to_string(),
-        "--name".to_string(),
-        quote(name),
-    ];
+fn construct_shawl_run_args(name: &str, cwd: &Option<String>, opts: &CommonOpts) -> Vec<String> {
+    let mut shawl_args = vec!["run".to_string(), "--name".to_string(), quote(name)];
     if let Some(st) = opts.stop_timeout {
         shawl_args.push("--stop-timeout".to_string());
         shawl_args.push(st.to_string());
@@ -215,8 +211,7 @@ fn construct_shawl_run_args(name: &String, cwd: &Option<String>, opts: &CommonOp
     if let Some(pass) = &opts.pass {
         shawl_args.push("--pass".to_string());
         shawl_args.push(
-            pass
-                .iter()
+            pass.iter()
                 .map(|x| x.to_string())
                 .collect::<Vec<String>>()
                 .join(","),
@@ -229,15 +224,15 @@ fn construct_shawl_run_args(name: &String, cwd: &Option<String>, opts: &CommonOp
     shawl_args
 }
 
-fn prepare_command(command: &Vec<String>) -> Vec<String> {
+fn prepare_command(command: &[String]) -> Vec<String> {
     command.iter().map(|x| quote(x)).collect::<Vec<String>>()
 }
 
-fn quote(text: &String) -> String {
-    if text.contains(" ") {
+fn quote(text: &str) -> String {
+    if text.contains(' ') {
         format!("\"{}\"", text).to_string()
     } else {
-        text.clone()
+        text.to_owned()
     }
 }
 
@@ -254,7 +249,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     debug!("{:?}", cli);
 
     match cli.sub {
-        Subcommand::Add { name, cwd, common: opts } => match add_service(name, cwd, opts) {
+        Subcommand::Add {
+            name,
+            cwd,
+            common: opts,
+        } => match add_service(name, cwd, opts) {
             Ok(_) => (),
             Err(_) => std::process::exit(1),
         },
@@ -338,14 +337,18 @@ mod service {
         let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
         let cli = crate::Cli::from_args();
         let (name, cwd, opts) = match cli.sub {
-            crate::Subcommand::Run { name, cwd, common: opts } => (name, cwd, opts),
+            crate::Subcommand::Run {
+                name,
+                cwd,
+                common: opts,
+            } => (name, cwd, opts),
             _ => {
                 // Can't get here.
                 return Ok(());
             }
         };
-        let pass = &opts.pass.unwrap_or(vec![0]);
-        let stop_timeout = &opts.stop_timeout.unwrap_or(3000u64);
+        let pass = &opts.pass.unwrap_or_else(|| vec![0]);
+        let stop_timeout = &opts.stop_timeout.unwrap_or(3000_u64);
         let mut service_exit_code = ServiceExitCode::NO_ERROR;
 
         let ignore_ctrlc = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -411,7 +414,9 @@ mod service {
                             controls_accepted: ServiceControlAccept::empty(),
                             exit_code: ServiceExitCode::NO_ERROR,
                             checkpoint: 0,
-                            wait_hint: std::time::Duration::from_millis(opts.stop_timeout.unwrap_or(3000) + 1000),
+                            wait_hint: std::time::Duration::from_millis(
+                                opts.stop_timeout.unwrap_or(3000) + 1000,
+                            ),
                         })?;
 
                         ignore_ctrlc.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -448,9 +453,10 @@ mod service {
                                         start_time.elapsed().as_millis(),
                                         code
                                     );
-                                    service_exit_code = match pass.contains(&code) {
-                                        true => ServiceExitCode::NO_ERROR,
-                                        false => ServiceExitCode::ServiceSpecific(code as u32),
+                                    service_exit_code = if pass.contains(&code) {
+                                        ServiceExitCode::NO_ERROR
+                                    } else {
+                                        ServiceExitCode::ServiceSpecific(code as u32)
                                     };
                                     break;
                                 }
@@ -471,31 +477,31 @@ mod service {
                     Ok(crate::ProcessStatus::Running) => (),
                     Ok(crate::ProcessStatus::Exited(code)) => {
                         info!("Command exited with code {:?}", code);
-                        service_exit_code = match pass.contains(&code) {
-                            true => ServiceExitCode::NO_ERROR,
-                            false => ServiceExitCode::ServiceSpecific(code as u32),
+                        service_exit_code = if pass.contains(&code) {
+                            ServiceExitCode::NO_ERROR
+                        } else {
+                            ServiceExitCode::ServiceSpecific(code as u32)
                         };
-                        match crate::should_restart_exited_command(
-                            &code,
+                        if crate::should_restart_exited_command(
+                            code,
                             opts.restart,
                             opts.no_restart,
                             &opts.restart_if,
                             &opts.restart_if_not,
                         ) {
-                            true => break 'inner,
-                            false => break 'outer,
+                            break 'inner;
+                        } else {
+                            break 'outer;
                         }
                     }
                     Ok(crate::ProcessStatus::Terminated) => {
                         info!("Command was terminated by a signal");
                         service_exit_code =
                             ServiceExitCode::Win32(winapi::shared::winerror::ERROR_PROCESS_ABORTED);
-                        match crate::should_restart_terminated_command(
-                            opts.restart,
-                            opts.no_restart,
-                        ) {
-                            true => break 'inner,
-                            false => break 'outer,
+                        if crate::should_restart_terminated_command(opts.restart, opts.no_restart) {
+                            break 'inner;
+                        } else {
+                            break 'outer;
                         }
                     }
                     Err(e) => {
@@ -538,7 +544,7 @@ speculate::speculate! {
     }
 
     fn s(text: &str) -> String {
-        return text.to_string();
+        text.to_string()
     }
 
     describe "CLI" {
@@ -885,26 +891,26 @@ speculate::speculate! {
 
     describe "should_restart_exited_command" {
         it "handles --restart" {
-            assert!(should_restart_exited_command(&5, true, false, &vec![], &vec![]));
+            assert!(should_restart_exited_command(5, true, false, &[], &[]));
         }
 
         it "handles --no-restart" {
-            assert!(!should_restart_exited_command(&0, false, true, &vec![], &vec![]));
+            assert!(!should_restart_exited_command(0, false, true, &[], &[]));
         }
 
         it "handles --restart-if" {
-            assert!(should_restart_exited_command(&0, false, false, &vec![0], &vec![]));
-            assert!(!should_restart_exited_command(&1, false, false, &vec![0], &vec![]));
+            assert!(should_restart_exited_command(0, false, false, &[0], &[]));
+            assert!(!should_restart_exited_command(1, false, false, &[0], &[]));
         }
 
         it "handles --restart-if-not" {
-            assert!(!should_restart_exited_command(&0, false, false, &vec![], &vec![0]));
-            assert!(should_restart_exited_command(&1, false, false, &vec![], &vec![0]));
+            assert!(!should_restart_exited_command(0, false, false, &[], &[0]));
+            assert!(should_restart_exited_command(1, false, false, &[], &[0]));
         }
 
         it "restarts nonzero by default" {
-            assert!(!should_restart_exited_command(&0, false, false, &vec![], &vec![]));
-            assert!(should_restart_exited_command(&1, false, false, &vec![], &vec![]));
+            assert!(!should_restart_exited_command(0, false, false, &[], &[]));
+            assert!(should_restart_exited_command(1, false, false, &[], &[]));
         }
     }
 
@@ -1168,14 +1174,14 @@ speculate::speculate! {
     describe "prepare_command" {
         it "handles commands without inner spaces" {
             assert_eq!(
-                prepare_command(&vec![s("cat"), s("file")]),
+                prepare_command(&[s("cat"), s("file")]),
                 vec![s("cat"), s("file")],
             );
         }
 
         it "handles commands with inner spaces" {
             assert_eq!(
-                prepare_command(&vec![s("cat"), s("some file")]),
+                prepare_command(&[s("cat"), s("some file")]),
                 vec![s("cat"), s("\"some file\"")],
             );
         }

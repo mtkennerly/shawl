@@ -52,9 +52,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::from_args();
     info!("{:?}", cli);
 
-    match cli.exit {
-        Some(code) => std::process::exit(code),
-        None => (),
+    if let Some(code) = cli.exit {
+        std::process::exit(code);
     }
 
     let running = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
