@@ -48,6 +48,17 @@ speculate::speculate! {
             assert!(pattern.is_match(&String::from_utf8_lossy(&sc_output.stdout)));
         }
 
+        it "handles command parts with spaces" {
+            let shawl_output = run_shawl(&["add", "--name", "shawl", "--", "foo bar", "--baz"]);
+            assert_eq!(shawl_output.status.code(), Some(0));
+
+            let sc_output = run_cmd(&["sc", "qc", "shawl"]);
+            let pattern = regex::Regex::new(
+                r#"BINARY_PATH_NAME *: .+shawl\.exe run --name shawl -- "foo bar" --baz"#
+            ).unwrap();
+            assert!(pattern.is_match(&String::from_utf8_lossy(&sc_output.stdout)));
+        }
+
         it "rejects nonexistent --cwd path" {
             let shawl_output = run_shawl(&["add", "--name", "shawl", "--cwd", "shawl-fake", "--", &child()]);
             assert_eq!(shawl_output.status.code(), Some(1));
