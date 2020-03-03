@@ -6,7 +6,7 @@ fn parse_canonical_path(path: &str) -> Result<String, std::io::Error> {
     Ok(std::fs::canonicalize(path)?.to_string_lossy().to_string())
 }
 
-#[derive(structopt::StructOpt, Debug, PartialEq)]
+#[derive(structopt::StructOpt, Clone, Debug, PartialEq)]
 struct CommonOpts {
     /// Exit codes that should be considered successful (comma-separated) [default: 0]
     #[structopt(long, value_name = "codes", use_delimiter(true))]
@@ -38,12 +38,20 @@ struct CommonOpts {
     #[structopt(long, value_name = "ms")]
     stop_timeout: Option<u64>,
 
+    /// Disable all of Shawl's logging
+    #[structopt(long)]
+    no_log: bool,
+
+    /// Disable logging of output from the command running as a service
+    #[structopt(long)]
+    no_log_cmd: bool,
+
     /// Command to run as a service
     #[structopt(required(true), last(true))]
     command: Vec<String>,
 }
 
-#[derive(structopt::StructOpt, Debug, PartialEq)]
+#[derive(structopt::StructOpt, Clone, Debug, PartialEq)]
 enum Subcommand {
     #[structopt(about = "Add a new service")]
     Add {
@@ -76,7 +84,7 @@ enum Subcommand {
     },
 }
 
-#[derive(structopt::StructOpt, Debug, PartialEq)]
+#[derive(structopt::StructOpt, Clone, Debug, PartialEq)]
 #[structopt(
     name = "shawl",
     about = "Wrap arbitrary commands as Windows services",
@@ -221,6 +229,12 @@ fn construct_shawl_run_args(name: &str, cwd: &Option<String>, opts: &CommonOpts)
         shawl_args.push("--cwd".to_string());
         shawl_args.push(quote(&cwd));
     };
+    if opts.no_log {
+        shawl_args.push("--no-log".to_string());
+    }
+    if opts.no_log_cmd {
+        shawl_args.push("--no-log-cmd".to_string());
+    }
     shawl_args
 }
 
@@ -244,7 +258,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => true,
     };
 
-    prepare_logging(console)?;
+    let should_log = match cli.clone().sub {
+        Subcommand::Add { common: opts, .. } => !opts.no_log,
+        Subcommand::Run { common: opts, .. } => !opts.no_log,
+    };
+    if should_log {
+        prepare_logging(console)?;
+    }
+
     debug!("********** LAUNCH **********");
     debug!("{:?}", cli);
 
@@ -300,6 +321,7 @@ fn check_process(
 #[cfg(windows)]
 mod service {
     use log::{debug, error, info};
+    use std::io::BufRead;
     use structopt::StructOpt;
     use windows_service::{
         define_windows_service,
@@ -333,6 +355,7 @@ mod service {
         let _ = run_service();
     }
 
+    #[allow(clippy::cognitive_complexity)]
     pub fn run_service() -> windows_service::Result<()> {
         let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
         let cli = crate::Cli::from_args();
@@ -360,11 +383,12 @@ mod service {
         })
         .expect("Unable to create ctrl-C handler");
 
+        let event_handler_name = name.clone();
         let event_handler = move |control_event| -> ServiceControlHandlerResult {
             match control_event {
                 ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
                 ServiceControl::Stop => {
-                    info!("Received stop event");
+                    info!("[{}] Received stop event", event_handler_name);
                     shutdown_tx.send(()).unwrap();
                     ServiceControlHandlerResult::NoError
                 }
@@ -372,7 +396,7 @@ mod service {
             }
         };
 
-        let status_handle = service_control_handler::register(name, event_handler)?;
+        let status_handle = service_control_handler::register(name.clone(), event_handler)?;
 
         status_handle.set_service_status(ServiceStatus {
             service_type: SERVICE_TYPE,
@@ -383,18 +407,30 @@ mod service {
             wait_hint: std::time::Duration::default(),
         })?;
 
-        debug!("Entering main service loop");
+        debug!("[{}] Entering main service loop", name);
         'outer: loop {
-            info!("Launching command");
+            info!("[{}] Launching command", name);
+            let should_log_cmd = !&opts.no_log_cmd;
             let mut child_cmd = std::process::Command::new(&opts.command[0]);
-            child_cmd.args(&opts.command[1..]);
+            child_cmd
+                .args(&opts.command[1..])
+                .stdout(if should_log_cmd {
+                    std::process::Stdio::piped()
+                } else {
+                    std::process::Stdio::null()
+                })
+                .stderr(if should_log_cmd {
+                    std::process::Stdio::piped()
+                } else {
+                    std::process::Stdio::null()
+                });
             if let Some(active_cwd) = &cwd {
                 child_cmd.current_dir(active_cwd);
             }
             let mut child = match child_cmd.spawn() {
                 Ok(c) => c,
                 Err(e) => {
-                    error!("Unable to launch command: {}", e);
+                    error!("[{}] Unable to launch command: {}", name, e);
                     service_exit_code = match e.raw_os_error() {
                         Some(win_code) => ServiceExitCode::Win32(win_code as u32),
                         None => {
@@ -404,6 +440,44 @@ mod service {
                     break;
                 }
             };
+
+            // Log stdout.
+            let stdout_name = name.clone();
+            let stdout_option = child.stdout.take();
+            let stdout_logger = std::thread::spawn(move || {
+                if !should_log_cmd {
+                    return;
+                }
+                if let Some(stdout) = stdout_option {
+                    std::io::BufReader::new(stdout)
+                        .lines()
+                        .for_each(|line| match line {
+                            Ok(ref x) if !x.is_empty() => {
+                                debug!("[{}] stdout: {:?}", stdout_name, x)
+                            }
+                            _ => (),
+                        });
+                }
+            });
+
+            // Log stderr.
+            let stderr_name = name.clone();
+            let stderr_option = child.stderr.take();
+            let stderr_logger = std::thread::spawn(move || {
+                if !should_log_cmd {
+                    return;
+                }
+                if let Some(stderr) = stderr_option {
+                    std::io::BufReader::new(stderr)
+                        .lines()
+                        .for_each(|line| match line {
+                            Ok(ref x) if !x.is_empty() => {
+                                debug!("[{}] stderr: {:?}", stderr_name, x)
+                            }
+                            _ => (),
+                        });
+                }
+            });
 
             'inner: loop {
                 match shutdown_rx.recv_timeout(std::time::Duration::from_secs(1)) {
@@ -420,7 +494,7 @@ mod service {
                         })?;
 
                         ignore_ctrlc.store(true, std::sync::atomic::Ordering::SeqCst);
-                        info!("Sending ctrl-C to command");
+                        info!("[{}] Sending ctrl-C to command", name);
                         unsafe {
                             if winapi::um::wincon::GenerateConsoleCtrlEvent(
                                 winapi::um::wincon::CTRL_C_EVENT,
@@ -428,7 +502,8 @@ mod service {
                             ) == 0
                             {
                                 error!(
-                                    "winapi GenerateConsoleCtrlEvent failed with code {:?}",
+                                    "[{}] winapi GenerateConsoleCtrlEvent failed with code {:?}",
+                                    name,
                                     winapi::um::errhandlingapi::GetLastError()
                                 );
                             };
@@ -441,7 +516,10 @@ mod service {
                                     if start_time.elapsed().as_millis() < (*stop_timeout).into() {
                                         std::thread::sleep(std::time::Duration::from_millis(50))
                                     } else {
-                                        info!("Killing command because stop timeout expired");
+                                        info!(
+                                            "[{}] Killing command because stop timeout expired",
+                                            name
+                                        );
                                         let _ = child.kill();
                                         service_exit_code = ServiceExitCode::NO_ERROR;
                                         break;
@@ -449,7 +527,8 @@ mod service {
                                 }
                                 Ok(crate::ProcessStatus::Exited(code)) => {
                                     info!(
-                                        "Command exited after {:?} ms with code {:?}",
+                                        "[{}] Command exited after {:?} ms with code {:?}",
+                                        name,
                                         start_time.elapsed().as_millis(),
                                         code
                                     );
@@ -461,7 +540,7 @@ mod service {
                                     break;
                                 }
                                 _ => {
-                                    info!("Command exited within stop timeout");
+                                    info!("[{}] Command exited within stop timeout", name);
                                     break;
                                 }
                             }
@@ -476,7 +555,7 @@ mod service {
                 match crate::check_process(&mut child) {
                     Ok(crate::ProcessStatus::Running) => (),
                     Ok(crate::ProcessStatus::Exited(code)) => {
-                        info!("Command exited with code {:?}", code);
+                        info!("[{}] Command exited with code {:?}", name, code);
                         service_exit_code = if pass.contains(&code) {
                             ServiceExitCode::NO_ERROR
                         } else {
@@ -495,7 +574,7 @@ mod service {
                         }
                     }
                     Ok(crate::ProcessStatus::Terminated) => {
-                        info!("Command was terminated by a signal");
+                        info!("[{}] Command was terminated by a signal", name);
                         service_exit_code =
                             ServiceExitCode::Win32(winapi::shared::winerror::ERROR_PROCESS_ABORTED);
                         if crate::should_restart_terminated_command(opts.restart, opts.no_restart) {
@@ -505,15 +584,25 @@ mod service {
                         }
                     }
                     Err(e) => {
-                        info!("Error trying to determine command status: {:?}", e);
+                        info!(
+                            "[{}] Error trying to determine command status: {:?}",
+                            name, e
+                        );
                         service_exit_code =
                             ServiceExitCode::Win32(winapi::shared::winerror::ERROR_PROCESS_ABORTED);
                         break 'inner;
                     }
                 }
             }
+
+            if let Err(e) = stdout_logger.join() {
+                error!("[{}] Unable to join stdout logger thread: {:?}", name, e);
+            }
+            if let Err(e) = stderr_logger.join() {
+                error!("[{}] Unable to join stderr logger thread: {:?}", name, e);
+            }
         }
-        debug!("Exited main service loop");
+        debug!("[{}] Exited main service loop", name);
 
         status_handle.set_service_status(ServiceStatus {
             service_type: SERVICE_TYPE,
@@ -563,6 +652,8 @@ speculate::speculate! {
                                 restart_if: vec![],
                                 restart_if_not: vec![],
                                 stop_timeout: None,
+                                no_log: false,
+                                no_log_cmd: false,
                                 command: vec![s("foo")],
                             }
                         }
@@ -591,6 +682,8 @@ speculate::speculate! {
                                 restart_if: vec![],
                                 restart_if_not: vec![],
                                 stop_timeout: None,
+                                no_log: false,
+                                no_log_cmd: false,
                                 command: vec![s("foo")],
                             }
                         }
@@ -612,6 +705,8 @@ speculate::speculate! {
                                 restart_if: vec![],
                                 restart_if_not: vec![],
                                 stop_timeout: None,
+                                no_log: false,
+                                no_log_cmd: false,
                                 command: vec![s("foo")],
                             }
                         }
@@ -633,6 +728,8 @@ speculate::speculate! {
                                 restart_if: vec![],
                                 restart_if_not: vec![],
                                 stop_timeout: None,
+                                no_log: false,
+                                no_log_cmd: false,
                                 command: vec![s("foo")],
                             }
                         }
@@ -654,6 +751,8 @@ speculate::speculate! {
                                 restart_if: vec![1, 2],
                                 restart_if_not: vec![],
                                 stop_timeout: None,
+                                no_log: false,
+                                no_log_cmd: false,
                                 command: vec![s("foo")],
                             }
                         }
@@ -675,6 +774,8 @@ speculate::speculate! {
                                 restart_if: vec![],
                                 restart_if_not: vec![1, 2],
                                 stop_timeout: None,
+                                no_log: false,
+                                no_log_cmd: false,
                                 command: vec![s("foo")],
                             }
                         }
@@ -696,6 +797,8 @@ speculate::speculate! {
                                 restart_if: vec![],
                                 restart_if_not: vec![],
                                 stop_timeout: Some(500),
+                                no_log: false,
+                                no_log_cmd: false,
                                 command: vec![s("foo")],
                             }
                         }
@@ -717,6 +820,8 @@ speculate::speculate! {
                                 restart_if: vec![],
                                 restart_if_not: vec![],
                                 stop_timeout: None,
+                                no_log: false,
+                                no_log_cmd: false,
                                 command: vec![s("foo")],
                             }
                         }
@@ -740,6 +845,8 @@ speculate::speculate! {
                                 restart_if: vec![],
                                 restart_if_not: vec![],
                                 stop_timeout: None,
+                                no_log: false,
+                                no_log_cmd: false,
                                 command: vec![s("foo")],
                             }
                         }
@@ -775,6 +882,8 @@ speculate::speculate! {
                                 restart_if: vec![],
                                 restart_if_not: vec![],
                                 stop_timeout: None,
+                                no_log: false,
+                                no_log_cmd: false,
                                 command: vec![s("foo")],
                             }
                         }
@@ -796,6 +905,8 @@ speculate::speculate! {
                                 restart_if: vec![],
                                 restart_if_not: vec![],
                                 stop_timeout: None,
+                                no_log: false,
+                                no_log_cmd: false,
                                 command: vec![s("foo")],
                             }
                         }
@@ -817,6 +928,8 @@ speculate::speculate! {
                                 restart_if: vec![],
                                 restart_if_not: vec![],
                                 stop_timeout: None,
+                                no_log: false,
+                                no_log_cmd: false,
                                 command: vec![s("foo")],
                             }
                         }
@@ -838,6 +951,8 @@ speculate::speculate! {
                                 restart_if: vec![1, 2],
                                 restart_if_not: vec![],
                                 stop_timeout: None,
+                                no_log: false,
+                                no_log_cmd: false,
                                 command: vec![s("foo")],
                             }
                         }
@@ -859,6 +974,8 @@ speculate::speculate! {
                                 restart_if: vec![],
                                 restart_if_not: vec![1, 2],
                                 stop_timeout: None,
+                                no_log: false,
+                                no_log_cmd: false,
                                 command: vec![s("foo")],
                             }
                         }
@@ -880,6 +997,54 @@ speculate::speculate! {
                                 restart_if: vec![],
                                 restart_if_not: vec![],
                                 stop_timeout: Some(500),
+                                no_log: false,
+                                no_log_cmd: false,
+                                command: vec![s("foo")],
+                            }
+                        }
+                    },
+                );
+            }
+
+            it "accepts --no-log" {
+                check_args(
+                    &["shawl", "run", "--no-log", "--", "foo"],
+                    Cli {
+                        sub: Subcommand::Run {
+                            name: s("Shawl"),
+                            cwd: None,
+                            common: CommonOpts {
+                                pass: None,
+                                restart: false,
+                                no_restart: false,
+                                restart_if: vec![],
+                                restart_if_not: vec![],
+                                stop_timeout: None,
+                                no_log: true,
+                                no_log_cmd: false,
+                                command: vec![s("foo")],
+                            }
+                        }
+                    },
+                );
+            }
+
+            it "accepts --no-log-cmd" {
+                check_args(
+                    &["shawl", "run", "--no-log-cmd", "--", "foo"],
+                    Cli {
+                        sub: Subcommand::Run {
+                            name: s("Shawl"),
+                            cwd: None,
+                            common: CommonOpts {
+                                pass: None,
+                                restart: false,
+                                no_restart: false,
+                                restart_if: vec![],
+                                restart_if_not: vec![],
+                                stop_timeout: None,
+                                no_log: false,
+                                no_log_cmd: true,
                                 command: vec![s("foo")],
                             }
                         }
@@ -935,6 +1100,8 @@ speculate::speculate! {
                         restart_if: vec![],
                         restart_if_not: vec![],
                         stop_timeout: None,
+                        no_log: false,
+                        no_log_cmd: false,
                         command: vec![s("foo")],
                     }
                 ),
@@ -954,6 +1121,8 @@ speculate::speculate! {
                         restart_if: vec![],
                         restart_if_not: vec![],
                         stop_timeout: None,
+                        no_log: false,
+                        no_log_cmd: false,
                         command: vec![s("foo")],
                     }
                 ),
@@ -973,6 +1142,8 @@ speculate::speculate! {
                         restart_if: vec![],
                         restart_if_not: vec![],
                         stop_timeout: None,
+                        no_log: false,
+                        no_log_cmd: false,
                         command: vec![s("foo")],
                     }
                 ),
@@ -992,6 +1163,8 @@ speculate::speculate! {
                         restart_if: vec![],
                         restart_if_not: vec![],
                         stop_timeout: None,
+                        no_log: false,
+                        no_log_cmd: false,
                         command: vec![s("foo")],
                     }
                 ),
@@ -1011,6 +1184,8 @@ speculate::speculate! {
                         restart_if: vec![0],
                         restart_if_not: vec![],
                         stop_timeout: None,
+                        no_log: false,
+                        no_log_cmd: false,
                         command: vec![s("foo")],
                     }
                 ),
@@ -1030,6 +1205,8 @@ speculate::speculate! {
                         restart_if: vec![1, 10],
                         restart_if_not: vec![],
                         stop_timeout: None,
+                        no_log: false,
+                        no_log_cmd: false,
                         command: vec![s("foo")],
                     }
                 ),
@@ -1049,6 +1226,8 @@ speculate::speculate! {
                         restart_if: vec![],
                         restart_if_not: vec![0],
                         stop_timeout: None,
+                        no_log: false,
+                        no_log_cmd: false,
                         command: vec![s("foo")],
                     }
                 ),
@@ -1068,6 +1247,8 @@ speculate::speculate! {
                         restart_if: vec![],
                         restart_if_not: vec![1, 10],
                         stop_timeout: None,
+                        no_log: false,
+                        no_log_cmd: false,
                         command: vec![s("foo")],
                     }
                 ),
@@ -1087,6 +1268,8 @@ speculate::speculate! {
                         restart_if: vec![],
                         restart_if_not: vec![],
                         stop_timeout: None,
+                        no_log: false,
+                        no_log_cmd: false,
                         command: vec![s("foo")],
                     }
                 ),
@@ -1106,6 +1289,8 @@ speculate::speculate! {
                         restart_if: vec![],
                         restart_if_not: vec![],
                         stop_timeout: None,
+                        no_log: false,
+                        no_log_cmd: false,
                         command: vec![s("foo")],
                     }
                 ),
@@ -1125,6 +1310,8 @@ speculate::speculate! {
                         restart_if: vec![],
                         restart_if_not: vec![],
                         stop_timeout: Some(3000),
+                        no_log: false,
+                        no_log_cmd: false,
                         command: vec![s("foo")],
                     }
                 ),
@@ -1144,6 +1331,8 @@ speculate::speculate! {
                         restart_if: vec![],
                         restart_if_not: vec![],
                         stop_timeout: None,
+                        no_log: false,
+                        no_log_cmd: false,
                         command: vec![s("foo")],
                     }
                 ),
@@ -1163,10 +1352,54 @@ speculate::speculate! {
                         restart_if: vec![],
                         restart_if_not: vec![],
                         stop_timeout: None,
+                        no_log: false,
+                        no_log_cmd: false,
                         command: vec![s("foo")],
                     }
                 ),
                 vec!["run", "--name", "shawl", "--cwd", "\"C:/Program Files/foo\""],
+            );
+        }
+
+
+        it "handles --no-log" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &None,
+                    &CommonOpts {
+                        pass: None,
+                        restart: false,
+                        no_restart: false,
+                        restart_if: vec![],
+                        restart_if_not: vec![],
+                        stop_timeout: None,
+                        no_log: true,
+                        no_log_cmd: false,
+                        command: vec![s("foo")],
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--no-log"],
+            );
+        }
+        it "handles --no-log-cmd" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &None,
+                    &CommonOpts {
+                        pass: None,
+                        restart: false,
+                        no_restart: false,
+                        restart_if: vec![],
+                        restart_if_not: vec![],
+                        stop_timeout: None,
+                        no_log: false,
+                        no_log_cmd: true,
+                        command: vec![s("foo")],
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--no-log-cmd"],
             );
         }
     }

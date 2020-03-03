@@ -52,6 +52,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::from_args();
     info!("{:?}", cli);
 
+    println!("shawl-child message on stdout");
+    eprintln!("shawl-child message on stderr");
+
     if let Some(code) = cli.exit {
         std::process::exit(code);
     }

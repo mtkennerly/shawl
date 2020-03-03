@@ -1,3 +1,8 @@
+## Unreleased
+
+* Added logging of stdout and stderr from commands.
+* Added `--no-log` and `--no-log-cmd` options to configure logging.
+
 ## v0.4.0 (2019-10-05)
 
 * Added `--cwd` for setting the command's working directory.

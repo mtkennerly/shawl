@@ -8,6 +8,20 @@ speculate::speculate! {
         format!("{}/target/debug/shawl-child.exe", env!("CARGO_MANIFEST_DIR"))
     }
 
+    fn log_file() -> String {
+        format!("{}/target/debug/shawl.log", env!("CARGO_MANIFEST_DIR"))
+    }
+
+    fn delete_log() {
+        if log_exists() {
+            std::fs::remove_file(log_file()).unwrap();
+        }
+    }
+
+    fn log_exists() -> bool {
+        std::path::Path::new(&log_file()).exists()
+    }
+
     fn run_cmd(args: &[&str]) -> std::process::Output {
         let out = std::process::Command::new(args[0])
                 .args(args[1..].iter())
@@ -115,6 +129,39 @@ speculate::speculate! {
 
             assert!(stdout.contains("STATE              : 1  STOPPED"));
             assert!(stdout.contains("WIN32_EXIT_CODE    : 0  (0x0)"));
+        }
+
+        it "logs command output by default" {
+            delete_log();
+
+            run_shawl(&["add", "--name", "shawl", "--", &child()]);
+            run_cmd(&["sc", "start", "shawl"]);
+            run_cmd(&["sc", "stop", "shawl"]);
+
+            let log = std::fs::read_to_string(log_file()).unwrap();
+            assert!(log.contains("[shawl] stdout: \"shawl-child message on stdout\""));
+            assert!(log.contains("[shawl] stderr: \"shawl-child message on stderr\""));
+        }
+
+        it "disables all logging with --no-log" {
+            delete_log();
+
+            run_shawl(&["add", "--name", "shawl", "--no-log", "--", &child()]);
+            run_cmd(&["sc", "start", "shawl"]);
+            run_cmd(&["sc", "stop", "shawl"]);
+
+            assert!(!log_exists());
+        }
+
+        it "disables command logging with --no-log-cmd" {
+            delete_log();
+
+            run_shawl(&["add", "--name", "shawl", "--no-log-cmd", "--", &child()]);
+            run_cmd(&["sc", "start", "shawl"]);
+            run_cmd(&["sc", "stop", "shawl"]);
+
+            let log = std::fs::read_to_string(log_file()).unwrap();
+            assert!(!log.contains("shawl-child has started"));
         }
     }
 }
