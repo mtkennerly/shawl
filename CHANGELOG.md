@@ -1,4 +1,4 @@
-## Unreleased
+## v0.5.0 (2020-03-03)
 
 * Added logging of stdout and stderr from commands.
 * Added `--no-log` and `--no-log-cmd` options to configure logging.
