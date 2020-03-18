@@ -244,7 +244,7 @@ fn prepare_command(command: &[String]) -> Vec<String> {
 
 fn quote(text: &str) -> String {
     if text.contains(' ') {
-        format!("\"{}\"", text).to_string()
+        format!("\"{}\"", text)
     } else {
         text.to_owned()
     }
