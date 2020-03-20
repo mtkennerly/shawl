@@ -49,6 +49,10 @@ struct CommonOpts {
     /// Command to run as a service
     #[structopt(required(true), last(true))]
     command: Vec<String>,
+
+    /// Append the service start arguments to the command
+    #[structopt(long)]
+    pass_start_args: bool,
 }
 
 #[derive(structopt::StructOpt, Clone, Debug, PartialEq)]
@@ -235,6 +239,9 @@ fn construct_shawl_run_args(name: &str, cwd: &Option<String>, opts: &CommonOpts)
     if opts.no_log_cmd {
         shawl_args.push("--no-log-cmd".to_string());
     }
+    if opts.pass_start_args {
+        shawl_args.push("--pass-start-args".to_string());
+    }
     shawl_args
 }
 
@@ -341,7 +348,7 @@ mod service {
         service_dispatcher::start(name, ffi_service_main)
     }
 
-    pub fn service_main(_arguments: Vec<std::ffi::OsString>) {
+    pub fn service_main(mut arguments: Vec<std::ffi::OsString>) {
         unsafe {
             // Windows services don't start with a console, so we have to
             // allocate one in order to send ctrl-C to children.
@@ -352,11 +359,15 @@ mod service {
                 );
             };
         }
-        let _ = run_service();
+        if !arguments.is_empty() {
+            // first argument is the service name
+            arguments.remove(0);
+        }
+        let _ = run_service(arguments);
     }
 
     #[allow(clippy::cognitive_complexity)]
-    pub fn run_service() -> windows_service::Result<()> {
+    pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service::Result<()> {
         let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
         let cli = crate::Cli::from_args();
         let (name, cwd, opts) = match cli.sub {
@@ -407,13 +418,21 @@ mod service {
             wait_hint: std::time::Duration::default(),
         })?;
 
+        let mut command = opts.command.into_iter();
+        let program = command.next().unwrap();
+        let mut args: Vec<_> = command.map(std::ffi::OsString::from).collect();
+        if opts.pass_start_args {
+            args.extend(start_arguments);
+        }
+
         debug!("[{}] Entering main service loop", name);
         'outer: loop {
             info!("[{}] Launching command", name);
             let should_log_cmd = !&opts.no_log_cmd;
-            let mut child_cmd = std::process::Command::new(&opts.command[0]);
+            let mut child_cmd = std::process::Command::new(&program);
+
             child_cmd
-                .args(&opts.command[1..])
+                .args(&args)
                 .stdout(if should_log_cmd {
                     std::process::Stdio::piped()
                 } else {
@@ -655,6 +674,7 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 command: vec![s("foo")],
+                                pass_start_args: false,
                             }
                         }
                     },
@@ -685,6 +705,7 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 command: vec![s("foo")],
+                                pass_start_args: false,
                             }
                         }
                     },
@@ -708,6 +729,7 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 command: vec![s("foo")],
+                                pass_start_args: false,
                             }
                         }
                     },
@@ -731,6 +753,7 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 command: vec![s("foo")],
+                                pass_start_args: false,
                             }
                         }
                     },
@@ -754,6 +777,7 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 command: vec![s("foo")],
+                                pass_start_args: false,
                             }
                         }
                     },
@@ -777,6 +801,7 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 command: vec![s("foo")],
+                                pass_start_args: false,
                             }
                         }
                     },
@@ -800,6 +825,7 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 command: vec![s("foo")],
+                                pass_start_args: false,
                             }
                         }
                     },
@@ -823,6 +849,7 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 command: vec![s("foo")],
+                                pass_start_args: false,
                             }
                         }
                     },
@@ -848,6 +875,7 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 command: vec![s("foo")],
+                                pass_start_args: false,
                             }
                         }
                     },
@@ -885,6 +913,7 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 command: vec![s("foo")],
+                                pass_start_args: false,
                             }
                         }
                     },
@@ -908,6 +937,7 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 command: vec![s("foo")],
+                                pass_start_args: false,
                             }
                         }
                     },
@@ -931,6 +961,7 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 command: vec![s("foo")],
+                                pass_start_args: false,
                             }
                         }
                     },
@@ -954,6 +985,7 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 command: vec![s("foo")],
+                                pass_start_args: false,
                             }
                         }
                     },
@@ -977,6 +1009,7 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 command: vec![s("foo")],
+                                pass_start_args: false,
                             }
                         }
                     },
@@ -1000,6 +1033,7 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 command: vec![s("foo")],
+                                pass_start_args: false,
                             }
                         }
                     },
@@ -1023,6 +1057,7 @@ speculate::speculate! {
                                 no_log: true,
                                 no_log_cmd: false,
                                 command: vec![s("foo")],
+                                pass_start_args: false,
                             }
                         }
                     },
@@ -1046,6 +1081,31 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: true,
                                 command: vec![s("foo")],
+                                pass_start_args: false,
+                            }
+                        }
+                    },
+                );
+            }
+
+            it "accepts --pass-start-args" {
+                check_args(
+                    &["shawl", "run", "--pass-start-args", "--", "foo"],
+                    Cli {
+                        sub: Subcommand::Run {
+                            name: s("Shawl"),
+                            cwd: None,
+                            common: CommonOpts {
+                                pass: None,
+                                restart: false,
+                                no_restart: false,
+                                restart_if: vec![],
+                                restart_if_not: vec![],
+                                stop_timeout: None,
+                                no_log: false,
+                                no_log_cmd: false,
+                                command: vec![s("foo")],
+                                pass_start_args: true,
                             }
                         }
                     },
@@ -1103,6 +1163,7 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         command: vec![s("foo")],
+                        pass_start_args: false,
                     }
                 ),
                 vec!["run", "--name", "shawl"],
@@ -1124,6 +1185,7 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         command: vec![s("foo")],
+                        pass_start_args: false,
                     }
                 ),
                 vec!["run", "--name", "\"C:/Program Files/shawl\""],
@@ -1145,6 +1207,7 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         command: vec![s("foo")],
+                        pass_start_args: false,
                     }
                 ),
                 vec!["run", "--name", "shawl", "--restart"],
@@ -1166,6 +1229,7 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         command: vec![s("foo")],
+                        pass_start_args: false,
                     }
                 ),
                 vec!["run", "--name", "shawl", "--no-restart"],
@@ -1187,6 +1251,7 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         command: vec![s("foo")],
+                        pass_start_args: false,
                     }
                 ),
                 vec!["run", "--name", "shawl", "--restart-if", "0"],
@@ -1208,6 +1273,7 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         command: vec![s("foo")],
+                        pass_start_args: false,
                     }
                 ),
                 vec!["run", "--name", "shawl", "--restart-if", "1,10"],
@@ -1229,6 +1295,7 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         command: vec![s("foo")],
+                        pass_start_args: false,
                     }
                 ),
                 vec!["run", "--name", "shawl", "--restart-if-not", "0"],
@@ -1250,6 +1317,7 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         command: vec![s("foo")],
+                        pass_start_args: false,
                     }
                 ),
                 vec!["run", "--name", "shawl", "--restart-if-not", "1,10"],
@@ -1271,6 +1339,7 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         command: vec![s("foo")],
+                        pass_start_args: false,
                     }
                 ),
                 vec!["run", "--name", "shawl", "--pass", "0"],
@@ -1292,6 +1361,7 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         command: vec![s("foo")],
+                        pass_start_args: false,
                     }
                 ),
                 vec!["run", "--name", "shawl", "--pass", "1,10"],
@@ -1313,6 +1383,7 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         command: vec![s("foo")],
+                        pass_start_args: false,
                     }
                 ),
                 vec!["run", "--name", "shawl", "--stop-timeout", "3000"],
@@ -1334,6 +1405,7 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         command: vec![s("foo")],
+                        pass_start_args: false,
                     }
                 ),
                 vec!["run", "--name", "shawl", "--cwd", "C:/foo"],
@@ -1355,6 +1427,7 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         command: vec![s("foo")],
+                        pass_start_args: false,
                     }
                 ),
                 vec!["run", "--name", "shawl", "--cwd", "\"C:/Program Files/foo\""],
@@ -1377,6 +1450,7 @@ speculate::speculate! {
                         no_log: true,
                         no_log_cmd: false,
                         command: vec![s("foo")],
+                        pass_start_args: false,
                     }
                 ),
                 vec!["run", "--name", "shawl", "--no-log"],
@@ -1397,9 +1471,32 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: true,
                         command: vec![s("foo")],
+                        pass_start_args: false,
                     }
                 ),
                 vec!["run", "--name", "shawl", "--no-log-cmd"],
+            );
+        }
+
+        it "handles --pass-start-args" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &None,
+                    &CommonOpts {
+                        pass: None,
+                        restart: false,
+                        no_restart: false,
+                        restart_if: vec![],
+                        restart_if_not: vec![],
+                        stop_timeout: None,
+                        no_log: false,
+                        no_log_cmd: false,
+                        command: vec![s("foo")],
+                        pass_start_args: true,
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--pass-start-args"],
             );
         }
     }
