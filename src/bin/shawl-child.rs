@@ -15,6 +15,10 @@ struct Cli {
     /// Exit immediately with this code
     #[structopt(long)]
     exit: Option<i32>,
+
+    /// Test option, prints an extra line to stdout if received
+    #[structopt(long)]
+    test: bool,
 }
 
 fn prepare_logging() -> Result<(), Box<dyn std::error::Error>> {
@@ -54,6 +58,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("shawl-child message on stdout");
     eprintln!("shawl-child message on stderr");
+
+    if cli.test {
+        println!("shawl-child test option received");
+    }
 
     if let Some(code) = cli.exit {
         std::process::exit(code);
