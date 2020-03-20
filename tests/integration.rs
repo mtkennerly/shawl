@@ -163,5 +163,14 @@ speculate::speculate! {
             let log = std::fs::read_to_string(log_file()).unwrap();
             assert!(!log.contains("shawl-child has started"));
         }
+
+        it "can pass arguments through successfully" {
+            run_shawl(&["add", "--name", "shawl", "--pass-start-args", "--", &child()]);
+            run_cmd(&["sc", "start", "shawl", "--test"]);
+            run_cmd(&["sc", "stop", "shawl"]);
+
+            let log = std::fs::read_to_string(log_file()).unwrap();
+            assert!(log.contains("[shawl] stdout: \"shawl-child test option received\""));
+        }
     }
 }
