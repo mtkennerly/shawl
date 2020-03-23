@@ -1,3 +1,9 @@
+## Unreleased
+
+* Added `--pass-start-args`.
+  (Contributed by [Enet4](https://github.com/Enet4))
+* Added log rotation and service-specific log files.
+
 ## v0.5.0 (2020-03-03)
 
 * Added logging of stdout and stderr from commands.

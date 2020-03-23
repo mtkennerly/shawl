@@ -100,37 +100,36 @@ struct Cli {
     sub: Subcommand,
 }
 
-fn prepare_logging(console: bool) -> Result<(), Box<dyn std::error::Error>> {
-    let mut log_file = std::env::current_exe()?;
-    log_file.pop();
-    log_file.push("shawl.log");
+fn prepare_logging(name: &str, console: bool) -> Result<(), Box<dyn std::error::Error>> {
+    let mut exe_dir = std::env::current_exe()?;
+    exe_dir.pop();
 
-    let mut loggers: Vec<Box<dyn simplelog::SharedLogger>> = vec![simplelog::WriteLogger::new(
-        simplelog::LevelFilter::Debug,
-        simplelog::ConfigBuilder::new()
-            .set_time_format_str("%Y-%m-%d %H:%M:%S")
-            .build(),
-        std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(log_file)?,
-    )];
+    let mut logger = flexi_logger::Logger::with_env_or_str("debug")
+        .log_to_file()
+        .directory(exe_dir)
+        .discriminant(format!("for_{}", name))
+        .append()
+        .rotate(
+            flexi_logger::Criterion::Size(1024 * 1024 * 2),
+            flexi_logger::Naming::Timestamps,
+            flexi_logger::Cleanup::KeepLogFiles(2),
+        )
+        .format_for_files(|w, now, record| {
+            write!(
+                w,
+                "{} [{}] {}",
+                now.now().format("%Y-%m-%d %H:%M:%S"),
+                record.level(),
+                &record.args()
+            )
+        })
+        .format_for_stderr(|w, _now, record| write!(w, "[{}] {}", record.level(), &record.args()));
 
     if console {
-        loggers.push(
-            simplelog::TermLogger::new(
-                simplelog::LevelFilter::Info,
-                simplelog::ConfigBuilder::new()
-                    .set_time_format_str("")
-                    .build(),
-                simplelog::TerminalMode::default(),
-            )
-            .expect("Unable to create terminal logger"),
-        );
+        logger = logger.duplicate_to_stderr(flexi_logger::Duplicate::Info);
     }
 
-    simplelog::CombinedLogger::init(loggers)?;
-
+    logger.start()?;
     Ok(())
 }
 
@@ -270,7 +269,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Subcommand::Run { common: opts, .. } => !opts.no_log,
     };
     if should_log {
-        prepare_logging(console)?;
+        let name = match cli.clone().sub {
+            Subcommand::Add { name, .. } => name,
+            Subcommand::Run { name, .. } => name,
+        };
+        prepare_logging(&name, console)?;
     }
 
     debug!("********** LAUNCH **********");
@@ -394,12 +397,11 @@ mod service {
         })
         .expect("Unable to create ctrl-C handler");
 
-        let event_handler_name = name.clone();
         let event_handler = move |control_event| -> ServiceControlHandlerResult {
             match control_event {
                 ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
                 ServiceControl::Stop => {
-                    info!("[{}] Received stop event", event_handler_name);
+                    info!("Received stop event");
                     shutdown_tx.send(()).unwrap();
                     ServiceControlHandlerResult::NoError
                 }
@@ -425,9 +427,9 @@ mod service {
             args.extend(start_arguments);
         }
 
-        debug!("[{}] Entering main service loop", name);
+        debug!("Entering main service loop");
         'outer: loop {
-            info!("[{}] Launching command", name);
+            info!("Launching command");
             let should_log_cmd = !&opts.no_log_cmd;
             let mut child_cmd = std::process::Command::new(&program);
 
@@ -449,7 +451,7 @@ mod service {
             let mut child = match child_cmd.spawn() {
                 Ok(c) => c,
                 Err(e) => {
-                    error!("[{}] Unable to launch command: {}", name, e);
+                    error!("Unable to launch command: {}", e);
                     service_exit_code = match e.raw_os_error() {
                         Some(win_code) => ServiceExitCode::Win32(win_code as u32),
                         None => {
@@ -461,7 +463,6 @@ mod service {
             };
 
             // Log stdout.
-            let stdout_name = name.clone();
             let stdout_option = child.stdout.take();
             let stdout_logger = std::thread::spawn(move || {
                 if !should_log_cmd {
@@ -471,16 +472,13 @@ mod service {
                     std::io::BufReader::new(stdout)
                         .lines()
                         .for_each(|line| match line {
-                            Ok(ref x) if !x.is_empty() => {
-                                debug!("[{}] stdout: {:?}", stdout_name, x)
-                            }
+                            Ok(ref x) if !x.is_empty() => debug!("stdout: {:?}", x),
                             _ => (),
                         });
                 }
             });
 
             // Log stderr.
-            let stderr_name = name.clone();
             let stderr_option = child.stderr.take();
             let stderr_logger = std::thread::spawn(move || {
                 if !should_log_cmd {
@@ -490,9 +488,7 @@ mod service {
                     std::io::BufReader::new(stderr)
                         .lines()
                         .for_each(|line| match line {
-                            Ok(ref x) if !x.is_empty() => {
-                                debug!("[{}] stderr: {:?}", stderr_name, x)
-                            }
+                            Ok(ref x) if !x.is_empty() => debug!("stderr: {:?}", x),
                             _ => (),
                         });
                 }
@@ -513,7 +509,7 @@ mod service {
                         })?;
 
                         ignore_ctrlc.store(true, std::sync::atomic::Ordering::SeqCst);
-                        info!("[{}] Sending ctrl-C to command", name);
+                        info!("Sending ctrl-C to command");
                         unsafe {
                             if winapi::um::wincon::GenerateConsoleCtrlEvent(
                                 winapi::um::wincon::CTRL_C_EVENT,
@@ -521,8 +517,7 @@ mod service {
                             ) == 0
                             {
                                 error!(
-                                    "[{}] winapi GenerateConsoleCtrlEvent failed with code {:?}",
-                                    name,
+                                    "winapi GenerateConsoleCtrlEvent failed with code {:?}",
                                     winapi::um::errhandlingapi::GetLastError()
                                 );
                             };
@@ -535,10 +530,7 @@ mod service {
                                     if start_time.elapsed().as_millis() < (*stop_timeout).into() {
                                         std::thread::sleep(std::time::Duration::from_millis(50))
                                     } else {
-                                        info!(
-                                            "[{}] Killing command because stop timeout expired",
-                                            name
-                                        );
+                                        info!("Killing command because stop timeout expired",);
                                         let _ = child.kill();
                                         service_exit_code = ServiceExitCode::NO_ERROR;
                                         break;
@@ -546,8 +538,7 @@ mod service {
                                 }
                                 Ok(crate::ProcessStatus::Exited(code)) => {
                                     info!(
-                                        "[{}] Command exited after {:?} ms with code {:?}",
-                                        name,
+                                        "Command exited after {:?} ms with code {:?}",
                                         start_time.elapsed().as_millis(),
                                         code
                                     );
@@ -559,7 +550,7 @@ mod service {
                                     break;
                                 }
                                 _ => {
-                                    info!("[{}] Command exited within stop timeout", name);
+                                    info!("Command exited within stop timeout");
                                     break;
                                 }
                             }
@@ -574,7 +565,7 @@ mod service {
                 match crate::check_process(&mut child) {
                     Ok(crate::ProcessStatus::Running) => (),
                     Ok(crate::ProcessStatus::Exited(code)) => {
-                        info!("[{}] Command exited with code {:?}", name, code);
+                        info!("Command exited with code {:?}", code);
                         service_exit_code = if pass.contains(&code) {
                             ServiceExitCode::NO_ERROR
                         } else {
@@ -593,7 +584,7 @@ mod service {
                         }
                     }
                     Ok(crate::ProcessStatus::Terminated) => {
-                        info!("[{}] Command was terminated by a signal", name);
+                        info!("Command was terminated by a signal");
                         service_exit_code =
                             ServiceExitCode::Win32(winapi::shared::winerror::ERROR_PROCESS_ABORTED);
                         if crate::should_restart_terminated_command(opts.restart, opts.no_restart) {
@@ -603,10 +594,7 @@ mod service {
                         }
                     }
                     Err(e) => {
-                        info!(
-                            "[{}] Error trying to determine command status: {:?}",
-                            name, e
-                        );
+                        info!("Error trying to determine command status: {:?}", e);
                         service_exit_code =
                             ServiceExitCode::Win32(winapi::shared::winerror::ERROR_PROCESS_ABORTED);
                         break 'inner;
@@ -615,13 +603,13 @@ mod service {
             }
 
             if let Err(e) = stdout_logger.join() {
-                error!("[{}] Unable to join stdout logger thread: {:?}", name, e);
+                error!("Unable to join stdout logger thread: {:?}", e);
             }
             if let Err(e) = stderr_logger.join() {
-                error!("[{}] Unable to join stderr logger thread: {:?}", name, e);
+                error!("Unable to join stderr logger thread: {:?}", e);
             }
         }
-        debug!("[{}] Exited main service loop", name);
+        debug!("Exited main service loop");
 
         status_handle.set_service_status(ServiceStatus {
             service_type: SERVICE_TYPE,

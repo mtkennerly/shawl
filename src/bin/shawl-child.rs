@@ -22,30 +22,26 @@ struct Cli {
 }
 
 fn prepare_logging() -> Result<(), Box<dyn std::error::Error>> {
-    let mut log_file = std::env::current_exe()?;
-    log_file.pop();
-    log_file.push("shawl-child.log");
+    let mut exe_dir = std::env::current_exe()?;
+    exe_dir.pop();
 
-    simplelog::CombinedLogger::init(vec![
-        simplelog::TermLogger::new(
-            simplelog::LevelFilter::Debug,
-            simplelog::ConfigBuilder::new()
-                .set_time_format_str("%Y-%m-%d %H:%M:%S")
-                .build(),
-            simplelog::TerminalMode::default(),
-        )
-        .expect("Unable to create terminal logger"),
-        simplelog::WriteLogger::new(
-            simplelog::LevelFilter::Debug,
-            simplelog::ConfigBuilder::new()
-                .set_time_format_str("%Y-%m-%d %H:%M:%S")
-                .build(),
-            std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(log_file)?,
-        ),
-    ])?;
+    flexi_logger::Logger::with_env_or_str("debug")
+        .log_to_file()
+        .directory(exe_dir)
+        .suppress_timestamp()
+        .append()
+        .duplicate_to_stderr(flexi_logger::Duplicate::Info)
+        .format_for_files(|w, now, record| {
+            write!(
+                w,
+                "{} [{}] {}",
+                now.now().format("%Y-%m-%d %H:%M:%S"),
+                record.level(),
+                &record.args()
+            )
+        })
+        .format_for_stderr(|w, _now, record| write!(w, "[{}] {}", record.level(), &record.args()))
+        .start()?;
 
     Ok(())
 }

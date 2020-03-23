@@ -9,7 +9,7 @@ speculate::speculate! {
     }
 
     fn log_file() -> String {
-        format!("{}/target/debug/shawl.log", env!("CARGO_MANIFEST_DIR"))
+        format!("{}/target/debug/shawl_for_shawl_rCURRENT.log", env!("CARGO_MANIFEST_DIR"))
     }
 
     fn delete_log() {
@@ -139,8 +139,8 @@ speculate::speculate! {
             run_cmd(&["sc", "stop", "shawl"]);
 
             let log = std::fs::read_to_string(log_file()).unwrap();
-            assert!(log.contains("[shawl] stdout: \"shawl-child message on stdout\""));
-            assert!(log.contains("[shawl] stderr: \"shawl-child message on stderr\""));
+            assert!(log.contains("stdout: \"shawl-child message on stdout\""));
+            assert!(log.contains("stderr: \"shawl-child message on stderr\""));
         }
 
         it "disables all logging with --no-log" {
@@ -170,7 +170,7 @@ speculate::speculate! {
             run_cmd(&["sc", "stop", "shawl"]);
 
             let log = std::fs::read_to_string(log_file()).unwrap();
-            assert!(log.contains("[shawl] stdout: \"shawl-child test option received\""));
+            assert!(log.contains("stdout: \"shawl-child test option received\""));
         }
     }
 }

@@ -35,11 +35,12 @@ status to Windows:
   the exit code to Windows as a service-specific error, unless the exit code
   is 0 or a code you've configured with `--pass`.
 
-Shawl creates a log file, `shawl.log`, in the same location as its executable,
-with both its own messages and the output from the commands that it runs.
-If anything goes wrong, you can read the log to find out more. You can disable
-all logging with `--no-log`, and you can disable just the command logs with
-`--no-log-cmd`.
+Shawl creates a log file for each service, `shawl_for_<service>_*.log`, in the
+same location as the Shawl executable, with both its own messages and the output
+from the commands that it runs. If anything goes wrong, you can read the log to
+find out more. You can disable all logging with `--no-log`, and you can disable
+just the command logs with `--no-log-cmd`. Each log file is limited to 2 MB, and
+up to 2 rotated copies will be retained.
 
 Shawl differs from existing solutions like [WinSW](https://github.com/kohsuke/winsw)
 and [NSSM](https://nssm.cc) in that they require running a special install
