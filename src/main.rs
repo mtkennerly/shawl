@@ -409,7 +409,7 @@ mod service {
             }
         };
 
-        let status_handle = service_control_handler::register(name.clone(), event_handler)?;
+        let status_handle = service_control_handler::register(name, event_handler)?;
 
         status_handle.set_service_status(ServiceStatus {
             service_type: SERVICE_TYPE,

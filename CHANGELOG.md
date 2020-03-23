@@ -1,4 +1,4 @@
-## Unreleased
+## v0.6.0 (2020-03-22)
 
 * Added `--pass-start-args`.
   (Contributed by [Enet4](https://github.com/Enet4))
