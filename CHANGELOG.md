@@ -1,4 +1,4 @@
-## Unreleased
+## v0.6.1 (2020-12-22)
 
 * Updated `windows-service` dependency to avoid a build failure where
   `err-derive` would use a private symbol from `quote`.
