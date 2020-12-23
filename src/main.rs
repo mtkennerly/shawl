@@ -259,10 +259,7 @@ fn quote(text: &str) -> String {
 #[cfg(windows)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::from_args();
-    let console = match cli.sub {
-        Subcommand::Run { .. } => false,
-        _ => true,
-    };
+    let console = !matches!(cli.sub, Subcommand::Run { .. });
 
     let should_log = match cli.clone().sub {
         Subcommand::Add { common: opts, .. } => !opts.no_log,
@@ -418,6 +415,7 @@ mod service {
             exit_code: ServiceExitCode::NO_ERROR,
             checkpoint: 0,
             wait_hint: std::time::Duration::default(),
+            process_id: None,
         })?;
 
         let mut command = opts.command.into_iter();
@@ -506,6 +504,7 @@ mod service {
                             wait_hint: std::time::Duration::from_millis(
                                 opts.stop_timeout.unwrap_or(3000) + 1000,
                             ),
+                            process_id: None,
                         })?;
 
                         ignore_ctrlc.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -618,6 +617,7 @@ mod service {
             exit_code: service_exit_code,
             checkpoint: 0,
             wait_hint: std::time::Duration::default(),
+            process_id: None,
         })?;
 
         Ok(())

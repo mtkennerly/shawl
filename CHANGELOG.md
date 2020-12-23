@@ -1,3 +1,8 @@
+## Unreleased
+
+* Updated `windows-service` dependency to avoid a build failure where
+  `err-derive` would use a private symbol from `quote`.
+
 ## v0.6.0 (2020-03-22)
 
 * Added `--pass-start-args`.
