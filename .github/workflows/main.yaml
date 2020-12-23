@@ -1,0 +1,74 @@
+on:
+  - push
+  - pull_request
+
+name: Main
+
+env:
+  RUST_BACKTRACE: '1'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - rust-target: x86_64-pc-windows-msvc
+            artifact-name: win64
+          - rust-target: i686-pc-windows-msvc
+            artifact-name: win32
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.7'
+      - uses: mtkennerly/dunamai-action@v1
+        with:
+          env-var: DUNAMAI_VERSION
+          args: --style semver
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.rust-target }}
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+      - uses: actions/upload-artifact@v1
+        with:
+          name: shawl-v${{ env.DUNAMAI_VERSION }}-${{ matrix.artifact-name }}
+          path: target/release/shawl.exe
+
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: -- --test-threads 1
+
+  lint:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.7'
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+      - run: |
+          pip install pre-commit
+          pre-commit run --all-files --show-diff-on-failure
