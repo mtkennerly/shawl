@@ -40,7 +40,7 @@ jobs:
       - uses: actions/upload-artifact@v1
         with:
           name: shawl-v${{ env.DUNAMAI_VERSION }}-${{ matrix.artifact-name }}
-          path: target/release/shawl.exe
+          path: target/${{ matrix.rust-target }}/release/shawl.exe
 
   test:
     runs-on: windows-latest
