@@ -1,3 +1,10 @@
+## Unreleased
+
+* Fixed an issue introduced in v0.6.1 where the 32-bit executable was not
+  usable on 32-bit systems.
+* Changed build process to avoid potential "VCRUNTIME140_1.dll was not found"
+  error when using the program.
+
 ## v0.6.1 (2020-12-22)
 
 * Updated `windows-service` dependency to avoid a build failure where

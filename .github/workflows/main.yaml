@@ -36,7 +36,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --release
+          args: --release --target ${{ matrix.rust-target }}
       - uses: actions/upload-artifact@v1
         with:
           name: shawl-v${{ env.DUNAMAI_VERSION }}-${{ matrix.artifact-name }}
