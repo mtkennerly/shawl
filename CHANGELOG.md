@@ -1,4 +1,4 @@
-## Unreleased
+## v0.6.2 (2021-03-09)
 
 * Fixed an issue introduced in v0.6.1 where the 32-bit executable was not
   usable on 32-bit systems.
