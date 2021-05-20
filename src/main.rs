@@ -402,6 +402,11 @@ mod service {
                     shutdown_tx.send(()).unwrap();
                     ServiceControlHandlerResult::NoError
                 }
+                ServiceControl::Shutdown => {
+                    info!("Received shutdown event");
+                    shutdown_tx.send(()).unwrap();
+                    ServiceControlHandlerResult::NoError
+                }
                 _ => ServiceControlHandlerResult::NotImplemented,
             }
         };
@@ -411,7 +416,7 @@ mod service {
         status_handle.set_service_status(ServiceStatus {
             service_type: SERVICE_TYPE,
             current_state: ServiceState::Running,
-            controls_accepted: ServiceControlAccept::STOP,
+            controls_accepted: ServiceControlAccept::STOP | ServiceControlAccept::SHUTDOWN,
             exit_code: ServiceExitCode::NO_ERROR,
             checkpoint: 0,
             wait_hint: std::time::Duration::default(),
