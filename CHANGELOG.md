@@ -1,4 +1,4 @@
-## Unreleased
+## v1.0.0 (2021-05-20)
 
 * Shawl now handles computer shutdown/restart, allowing the wrapped program
   to exit gracefully.
