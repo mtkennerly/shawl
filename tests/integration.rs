@@ -196,20 +196,20 @@ speculate::speculate! {
             assert!(log.contains("stdout: \"shawl-child test option received\""));
         }
 
-        it "passes --cwd into the command PATH" {
+        it "can resolve relative commands with bare executable name and --cwd" {
             delete_log();
+            std::fs::create_dir(log_custom_dir()).unwrap();
+            std::fs::copy(child(), format!("{}/shawl-child-copy.exe", log_custom_dir())).unwrap();
 
-            let target_dir = format!("{}\\target", env!("CARGO_MANIFEST_DIR"));
-            run_shawl(&["add", "--name", "shawl", "--cwd", &target_dir, "--", "./debug/shawl-child.exe"]);
+            run_shawl(&["add", "--name", "shawl", "--cwd", &log_custom_dir(), "--", "shawl-child-copy.exe"]);
             run_cmd(&["sc", "start", "shawl"]);
             run_cmd(&["sc", "stop", "shawl"]);
 
             let log = std::fs::read_to_string(log_file()).unwrap();
             // Example log content, without escaping: "PATH: C:\tmp;\\?\C:\git\shawl\target"
             let pattern = regex::Regex::new(
-                r#"(?m)"\[INFO\] PATH: .+;[^;]+target"$"#
+                &format!(r#"PATH: .+{}"#, &log_custom_dir().replace("/", "\\").replace("\\", "\\\\\\\\"))
             ).unwrap();
-            println!("{}", &log);
             assert!(pattern.is_match(&log));
         }
     }
