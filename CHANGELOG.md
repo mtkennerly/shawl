@@ -1,3 +1,8 @@
+## Unreleased
+
+* Added `--log-dir`.
+  (Contributed by [oscarbailey-tc](https://github.com/mtkennerly/shawl/pull/19))
+
 ## v1.0.0 (2021-05-20)
 
 * Shawl now handles computer shutdown/restart, allowing the wrapped program
@@ -18,7 +23,7 @@
 ## v0.6.0 (2020-03-22)
 
 * Added `--pass-start-args`.
-  (Contributed by [Enet4](https://github.com/Enet4))
+  (Contributed by [Enet4](https://github.com/mtkennerly/shawl/pull/6))
 * Added log rotation and service-specific log files.
 
 ## v0.5.0 (2020-03-03)

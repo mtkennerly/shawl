@@ -104,7 +104,11 @@ struct Cli {
     sub: Subcommand,
 }
 
-fn prepare_logging(name: &str, log_dir: Option<String>, console: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn prepare_logging(
+    name: &str,
+    log_dir: Option<String>,
+    console: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut exe_dir = std::env::current_exe()?;
     exe_dir.pop();
 
@@ -239,7 +243,7 @@ fn construct_shawl_run_args(name: &str, cwd: &Option<String>, opts: &CommonOpts)
     }
     if let Some(cwd) = &cwd {
         shawl_args.push("--cwd".to_string());
-        shawl_args.push(quote(&cwd));
+        shawl_args.push(quote(cwd));
     };
     if opts.no_log {
         shawl_args.push("--no-log".to_string());
@@ -249,7 +253,7 @@ fn construct_shawl_run_args(name: &str, cwd: &Option<String>, opts: &CommonOpts)
     }
     if let Some(log_dir) = &opts.log_dir {
         shawl_args.push("--log-dir".to_string());
-        shawl_args.push(quote(&log_dir));
+        shawl_args.push(quote(log_dir));
     }
     if opts.pass_start_args {
         shawl_args.push("--pass-start-args".to_string());

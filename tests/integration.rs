@@ -175,7 +175,7 @@ speculate::speculate! {
             run_cmd(&["sc", "stop", "shawl"]);
 
             let log = std::fs::read_to_string(log_file()).unwrap();
-            assert!(!log.contains("shawl-child has started"));
+            assert!(!log.contains("shawl-child message on stdout"));
         }
 
         it "creates log file in custom dir with --log-dir" {
@@ -187,7 +187,7 @@ speculate::speculate! {
             run_cmd(&["sc", "stop", "shawl"]);
 
             let log = std::fs::read_to_string(log_file_custom_dir()).unwrap();
-            assert!(!log.contains("shawl-child has started"));
+            assert!(log.contains("shawl-child message on stdout"));
             assert!(!log_exists()); // Ensure log file hasn't been created next to the .exe
         }
 
