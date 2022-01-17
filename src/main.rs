@@ -471,6 +471,13 @@ mod service {
                 });
             if let Some(active_cwd) = &cwd {
                 child_cmd.current_dir(active_cwd);
+                child_cmd.env(
+                    "PATH",
+                    match std::env::var("PATH") {
+                        Ok(path) => format!("{};{}", path, active_cwd),
+                        Err(_) => active_cwd.to_string(),
+                    },
+                );
             }
             let mut child = match child_cmd.spawn() {
                 Ok(c) => c,

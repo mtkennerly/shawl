@@ -20,15 +20,12 @@ speculate::speculate! {
         format!("{}/target/debug/log_dir", env!("CARGO_MANIFEST_DIR"))
     }
 
-    fn delete_log_custom_dir() {
-        if std::path::Path::new(&log_custom_dir()).is_dir() {
-            std::fs::remove_dir_all(log_custom_dir()).unwrap();
-        }
-    }
-
     fn delete_log() {
         if log_exists() {
             std::fs::remove_file(log_file()).unwrap();
+        }
+        if std::path::Path::new(&log_custom_dir()).is_dir() {
+            std::fs::remove_dir_all(log_custom_dir()).unwrap();
         }
     }
 
@@ -180,7 +177,6 @@ speculate::speculate! {
 
         it "creates log file in custom dir with --log-dir" {
             delete_log();
-            delete_log_custom_dir();
 
             run_shawl(&["add", "--name", "shawl", "--log-dir", &log_custom_dir(), "--", &child()]);
             run_cmd(&["sc", "start", "shawl"]);
@@ -198,6 +194,22 @@ speculate::speculate! {
 
             let log = std::fs::read_to_string(log_file()).unwrap();
             assert!(log.contains("stdout: \"shawl-child test option received\""));
+        }
+
+        it "passes --cwd into the command PATH" {
+            delete_log();
+
+            let target_dir = format!("{}\\target", env!("CARGO_MANIFEST_DIR"));
+            run_shawl(&["add", "--name", "shawl", "--cwd", &target_dir, "--", "./debug/shawl-child.exe"]);
+            run_cmd(&["sc", "start", "shawl"]);
+            run_cmd(&["sc", "stop", "shawl"]);
+
+            let log = std::fs::read_to_string(log_file()).unwrap();
+            // Example log content, without escaping: "PATH: C:\tmp;\\?\C:\git\shawl\target"
+            let pattern = regex::Regex::new(
+                &format!(r#"PATH: .+;\\\\\\\\\?\\\\{}"#, &target_dir.replace("\\", "\\\\\\\\"))
+            ).unwrap();
+            assert!(pattern.is_match(&log));
         }
     }
 }

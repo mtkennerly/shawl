@@ -51,6 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("********** LAUNCH **********");
     let cli = Cli::from_args();
     info!("{:?}", cli);
+    info!("PATH: {}", std::env::var("PATH").unwrap());
 
     println!("shawl-child message on stdout");
     eprintln!("shawl-child message on stderr");
