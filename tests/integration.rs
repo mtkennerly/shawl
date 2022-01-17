@@ -12,6 +12,20 @@ speculate::speculate! {
         format!("{}/target/debug/shawl_for_shawl_rCURRENT.log", env!("CARGO_MANIFEST_DIR"))
     }
 
+    fn log_file_custom_dir() -> String {
+        format!("{}/target/debug/log_dir/shawl_for_shawl_rCURRENT.log", env!("CARGO_MANIFEST_DIR"))
+    }
+
+    fn log_custom_dir() -> String {
+        format!("{}/target/debug/log_dir", env!("CARGO_MANIFEST_DIR"))
+    }
+
+    fn delete_log_custom_dir() {
+        if std::path::Path::new(&log_custom_dir()).is_dir() {
+            std::fs::remove_dir_all(log_custom_dir()).unwrap();
+        }
+    }
+
     fn delete_log() {
         if log_exists() {
             std::fs::remove_file(log_file()).unwrap();
@@ -162,6 +176,19 @@ speculate::speculate! {
 
             let log = std::fs::read_to_string(log_file()).unwrap();
             assert!(!log.contains("shawl-child has started"));
+        }
+
+        it "creates log file in custom dir with --log-dir" {
+            delete_log();
+            delete_log_custom_dir();
+
+            run_shawl(&["add", "--name", "shawl", "--log-dir", &log_custom_dir(), "--", &child()]);
+            run_cmd(&["sc", "start", "shawl"]);
+            run_cmd(&["sc", "stop", "shawl"]);
+
+            let log = std::fs::read_to_string(log_file_custom_dir()).unwrap();
+            assert!(!log.contains("shawl-child has started"));
+            assert!(!log_exists()); // Ensure log file hasn't been created next to the .exe
         }
 
         it "can pass arguments through successfully" {
