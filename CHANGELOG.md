@@ -7,6 +7,7 @@
   Specifically, assuming there is a `C:\foo\bar\baz.exe`, then `--cwd C:\foo\bar -- baz.exe`
   will work now, but `--cwd C:\foo -- bar\baz.exe` still will not work, because the PATH
   only helps to resolve executable names, not subfolder names.
+* Added version to executable properties.
 
 ## v1.0.0 (2021-05-20)
 
