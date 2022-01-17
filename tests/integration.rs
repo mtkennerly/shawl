@@ -207,8 +207,9 @@ speculate::speculate! {
             let log = std::fs::read_to_string(log_file()).unwrap();
             // Example log content, without escaping: "PATH: C:\tmp;\\?\C:\git\shawl\target"
             let pattern = regex::Regex::new(
-                &format!(r#"PATH: .+;\\\\\\\\\?\\\\{}"#, &target_dir.replace("\\", "\\\\\\\\"))
+                r#"(?m)"\[INFO\] PATH: .+;[^;]+target"$"#
             ).unwrap();
+            println!("{}", &log);
             assert!(pattern.is_match(&log));
         }
     }
