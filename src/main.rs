@@ -6,6 +6,19 @@ fn parse_canonical_path(path: &str) -> Result<String, std::io::Error> {
     Ok(std::fs::canonicalize(path)?.to_string_lossy().to_string())
 }
 
+fn parse_ensured_directory(path: &str) -> Result<String, Box<dyn std::error::Error>> {
+    std::fs::create_dir_all(&path)?;
+    Ok(std::fs::canonicalize(path)?.to_string_lossy().to_string())
+}
+
+fn parse_env_var(value: &str) -> Result<(String, String), Box<dyn std::error::Error>> {
+    let parts: Vec<&str> = value.splitn(2, '=').collect();
+    if parts.len() != 2 {
+        return Err(format!("Invalid KEY=value formatting in '{}'", value).into());
+    }
+    Ok((parts[0].to_string(), parts[1].to_string()))
+}
+
 #[derive(structopt::StructOpt, Clone, Debug, PartialEq)]
 struct CommonOpts {
     /// Exit codes that should be considered successful (comma-separated) [default: 0]
@@ -47,16 +60,24 @@ struct CommonOpts {
     no_log_cmd: bool,
 
     /// Write log file to a custom directory. This directory will be created if it doesn't exist.
-    #[structopt(long)]
+    #[structopt(long, parse(try_from_str = parse_ensured_directory))]
     log_dir: Option<String>,
-
-    /// Command to run as a service
-    #[structopt(required(true), last(true))]
-    command: Vec<String>,
 
     /// Append the service start arguments to the command
     #[structopt(long)]
     pass_start_args: bool,
+
+    /// Additional environment variable (repeatable)
+    #[structopt(long, number_of_values = 1, parse(try_from_str = parse_env_var))]
+    env: Vec<(String, String)>,
+
+    /// Additional directory to add to the PATH environment variable (repeatable)
+    #[structopt(long, number_of_values = 1, parse(try_from_str = parse_canonical_path))]
+    path: Vec<String>,
+
+    /// Command to run as a service
+    #[structopt(required(true), last(true))]
+    command: Vec<String>,
 }
 
 #[derive(structopt::StructOpt, Clone, Debug, PartialEq)]
@@ -257,6 +278,18 @@ fn construct_shawl_run_args(name: &str, cwd: &Option<String>, opts: &CommonOpts)
     }
     if opts.pass_start_args {
         shawl_args.push("--pass-start-args".to_string());
+    }
+    if !opts.env.is_empty() {
+        for (x, y) in &opts.env {
+            shawl_args.push("--env".to_string());
+            shawl_args.push(quote(&format!("{}={}", x, y)));
+        }
+    }
+    if !opts.path.is_empty() {
+        for path in &opts.path {
+            shawl_args.push("--path".to_string());
+            shawl_args.push(quote(path));
+        }
     }
     shawl_args
 }
@@ -469,6 +502,18 @@ mod service {
                 } else {
                     std::process::Stdio::null()
                 });
+            for (key, value) in &opts.env {
+                child_cmd.env(key, value);
+            }
+            if !opts.path.is_empty() {
+                child_cmd.env(
+                    "PATH",
+                    match std::env::var("PATH") {
+                        Ok(path) => format!("{};{}", path, &opts.path.join(";")),
+                        Err(_) => opts.path.join(";").to_string(),
+                    },
+                );
+            }
             if let Some(active_cwd) = &cwd {
                 child_cmd.current_dir(active_cwd);
                 child_cmd.env(
@@ -676,6 +721,10 @@ speculate::speculate! {
         text.to_string()
     }
 
+    fn p(path: &str) -> String {
+        std::fs::canonicalize(&path).unwrap().to_string_lossy().to_string()
+    }
+
     describe "CLI" {
         describe "run subcommand" {
             it "works with minimal arguments" {
@@ -695,8 +744,10 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 log_dir: None,
-                                command: vec![s("foo")],
                                 pass_start_args: false,
+                                env: vec![],
+                                path: vec![],
+                                command: vec![s("foo")],
                             }
                         }
                     },
@@ -727,8 +778,10 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 log_dir: None,
-                                command: vec![s("foo")],
                                 pass_start_args: false,
+                                env: vec![],
+                                path: vec![],
+                                command: vec![s("foo")],
                             }
                         }
                     },
@@ -752,8 +805,10 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 log_dir: None,
-                                command: vec![s("foo")],
                                 pass_start_args: false,
+                                env: vec![],
+                                path: vec![],
+                                command: vec![s("foo")],
                             }
                         }
                     },
@@ -777,8 +832,10 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 log_dir: None,
-                                command: vec![s("foo")],
                                 pass_start_args: false,
+                                env: vec![],
+                                path: vec![],
+                                command: vec![s("foo")],
                             }
                         }
                     },
@@ -802,8 +859,10 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 log_dir: None,
-                                command: vec![s("foo")],
                                 pass_start_args: false,
+                                env: vec![],
+                                path: vec![],
+                                command: vec![s("foo")],
                             }
                         }
                     },
@@ -827,8 +886,10 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 log_dir: None,
-                                command: vec![s("foo")],
                                 pass_start_args: false,
+                                env: vec![],
+                                path: vec![],
+                                command: vec![s("foo")],
                             }
                         }
                     },
@@ -852,8 +913,10 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 log_dir: None,
-                                command: vec![s("foo")],
                                 pass_start_args: false,
+                                env: vec![],
+                                path: vec![],
+                                command: vec![s("foo")],
                             }
                         }
                     },
@@ -877,8 +940,10 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 log_dir: None,
-                                command: vec![s("foo")],
                                 pass_start_args: false,
+                                env: vec![],
+                                path: vec![],
+                                command: vec![s("foo")],
                             }
                         }
                     },
@@ -904,8 +969,10 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 log_dir: None,
-                                command: vec![s("foo")],
                                 pass_start_args: false,
+                                env: vec![],
+                                path: vec![],
+                                command: vec![s("foo")],
                             }
                         }
                     },
@@ -943,8 +1010,10 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 log_dir: None,
-                                command: vec![s("foo")],
                                 pass_start_args: false,
+                                env: vec![],
+                                path: vec![],
+                                command: vec![s("foo")],
                             }
                         }
                     },
@@ -968,8 +1037,10 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 log_dir: None,
-                                command: vec![s("foo")],
                                 pass_start_args: false,
+                                env: vec![],
+                                path: vec![],
+                                command: vec![s("foo")],
                             }
                         }
                     },
@@ -993,8 +1064,10 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 log_dir: None,
-                                command: vec![s("foo")],
                                 pass_start_args: false,
+                                env: vec![],
+                                path: vec![],
+                                command: vec![s("foo")],
                             }
                         }
                     },
@@ -1018,8 +1091,10 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 log_dir: None,
-                                command: vec![s("foo")],
                                 pass_start_args: false,
+                                env: vec![],
+                                path: vec![],
+                                command: vec![s("foo")],
                             }
                         }
                     },
@@ -1043,8 +1118,10 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 log_dir: None,
-                                command: vec![s("foo")],
                                 pass_start_args: false,
+                                env: vec![],
+                                path: vec![],
+                                command: vec![s("foo")],
                             }
                         }
                     },
@@ -1068,8 +1145,10 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 log_dir: None,
-                                command: vec![s("foo")],
                                 pass_start_args: false,
+                                env: vec![],
+                                path: vec![],
+                                command: vec![s("foo")],
                             }
                         }
                     },
@@ -1093,8 +1172,10 @@ speculate::speculate! {
                                 no_log: true,
                                 no_log_cmd: false,
                                 log_dir: None,
-                                command: vec![s("foo")],
                                 pass_start_args: false,
+                                env: vec![],
+                                path: vec![],
+                                command: vec![s("foo")],
                             }
                         }
                     },
@@ -1118,8 +1199,10 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: true,
                                 log_dir: None,
-                                command: vec![s("foo")],
                                 pass_start_args: false,
+                                env: vec![],
+                                path: vec![],
+                                command: vec![s("foo")],
                             }
                         }
                     },
@@ -1127,8 +1210,9 @@ speculate::speculate! {
             }
 
             it "accepts --log-dir" {
+                let path = env!("CARGO_MANIFEST_DIR");
                 check_args(
-                    &["shawl", "run", "--log-dir", "C:\\any\\dir", "--", "foo"],
+                    &["shawl", "run", "--log-dir", path, "--", "foo"],
                     Cli {
                         sub: Subcommand::Run {
                             name: s("Shawl"),
@@ -1142,9 +1226,11 @@ speculate::speculate! {
                                 stop_timeout: None,
                                 no_log: false,
                                 no_log_cmd: false,
-                                log_dir: Some("C:\\any\\dir".to_string()),
-                                command: vec![s("foo")],
+                                log_dir: Some(p(path)),
                                 pass_start_args: false,
+                                env: vec![],
+                                path: vec![],
+                                command: vec![s("foo")],
                             }
                         }
                     },
@@ -1168,8 +1254,121 @@ speculate::speculate! {
                                 no_log: false,
                                 no_log_cmd: false,
                                 log_dir: None,
-                                command: vec![s("foo")],
                                 pass_start_args: true,
+                                env: vec![],
+                                path: vec![],
+                                command: vec![s("foo")],
+                            }
+                        }
+                    },
+                );
+            }
+
+            it "accepts --env" {
+                check_args(
+                    &["shawl", "add", "--env", "FOO=bar", "--name", "foo", "--", "foo"],
+                    Cli {
+                        sub: Subcommand::Add {
+                            name: s("foo"),
+                            cwd: None,
+                            common: CommonOpts {
+                                pass: None,
+                                restart: false,
+                                no_restart: false,
+                                restart_if: vec![],
+                                restart_if_not: vec![],
+                                stop_timeout: None,
+                                no_log: false,
+                                no_log_cmd: false,
+                                log_dir: None,
+                                pass_start_args: false,
+                                env: vec![(s("FOO"), s("bar"))],
+                                path: vec![],
+                                command: vec![s("foo")],
+                            }
+                        }
+                    },
+                );
+            }
+
+            it "accepts --env multiple times" {
+                check_args(
+                    &["shawl", "add", "--env", "FOO=1", "--env", "BAR=2", "--name", "foo", "--", "foo"],
+                    Cli {
+                        sub: Subcommand::Add {
+                            name: s("foo"),
+                            cwd: None,
+                            common: CommonOpts {
+                                pass: None,
+                                restart: false,
+                                no_restart: false,
+                                restart_if: vec![],
+                                restart_if_not: vec![],
+                                stop_timeout: None,
+                                no_log: false,
+                                no_log_cmd: false,
+                                log_dir: None,
+                                pass_start_args: false,
+                                env: vec![(s("FOO"), s("1")), (s("BAR"), s("2"))],
+                                path: vec![],
+                                command: vec![s("foo")],
+                            }
+                        }
+                    },
+                );
+            }
+
+            it "accepts --path" {
+                let path = env!("CARGO_MANIFEST_DIR");
+                check_args(
+                    &["shawl", "add", "--path", path, "--name", "foo", "--", "foo"],
+                    Cli {
+                        sub: Subcommand::Add {
+                            name: s("foo"),
+                            cwd: None,
+                            common: CommonOpts {
+                                pass: None,
+                                restart: false,
+                                no_restart: false,
+                                restart_if: vec![],
+                                restart_if_not: vec![],
+                                stop_timeout: None,
+                                no_log: false,
+                                no_log_cmd: false,
+                                log_dir: None,
+                                pass_start_args: false,
+                                env: vec![],
+                                path: vec![p(path)],
+                                command: vec![s("foo")],
+                            }
+                        }
+                    },
+                );
+            }
+
+            it "accepts --path multiple times" {
+                let path1 = format!("{}/target", env!("CARGO_MANIFEST_DIR"));
+                let path2 = format!("{}/src", env!("CARGO_MANIFEST_DIR"));
+                check_args(
+                    &["shawl", "add", "--path", &path1, "--path", &path2, "--name", "foo", "--", "foo"],
+                    Cli {
+                        sub: Subcommand::Add {
+                            name: s("foo"),
+                            cwd: None,
+                            common: CommonOpts {
+                                pass: None,
+                                restart: false,
+                                no_restart: false,
+                                restart_if: vec![],
+                                restart_if_not: vec![],
+                                stop_timeout: None,
+                                no_log: false,
+                                no_log_cmd: false,
+                                log_dir: None,
+                                pass_start_args: false,
+                                env: vec![],
+                                path: vec![p(&path1), p(&path2)],
+                                command: vec![s("foo")],
                             }
                         }
                     },
@@ -1227,8 +1426,10 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         log_dir: None,
-                        command: vec![s("foo")],
                         pass_start_args: false,
+                        env: vec![],
+                        path: vec![],
+                        command: vec![s("foo")],
                     }
                 ),
                 vec!["run", "--name", "shawl"],
@@ -1250,8 +1451,10 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         log_dir: None,
-                        command: vec![s("foo")],
                         pass_start_args: false,
+                        env: vec![],
+                        path: vec![],
+                        command: vec![s("foo")],
                     }
                 ),
                 vec!["run", "--name", "\"C:/Program Files/shawl\""],
@@ -1273,8 +1476,10 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         log_dir: None,
-                        command: vec![s("foo")],
                         pass_start_args: false,
+                        env: vec![],
+                        path: vec![],
+                        command: vec![s("foo")],
                     }
                 ),
                 vec!["run", "--name", "shawl", "--restart"],
@@ -1296,8 +1501,10 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         log_dir: None,
-                        command: vec![s("foo")],
                         pass_start_args: false,
+                        env: vec![],
+                        path: vec![],
+                        command: vec![s("foo")],
                     }
                 ),
                 vec!["run", "--name", "shawl", "--no-restart"],
@@ -1319,8 +1526,10 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         log_dir: None,
-                        command: vec![s("foo")],
                         pass_start_args: false,
+                        env: vec![],
+                        path: vec![],
+                        command: vec![s("foo")],
                     }
                 ),
                 vec!["run", "--name", "shawl", "--restart-if", "0"],
@@ -1342,8 +1551,10 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         log_dir: None,
-                        command: vec![s("foo")],
                         pass_start_args: false,
+                        env: vec![],
+                        path: vec![],
+                        command: vec![s("foo")],
                     }
                 ),
                 vec!["run", "--name", "shawl", "--restart-if", "1,10"],
@@ -1365,8 +1576,10 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         log_dir: None,
-                        command: vec![s("foo")],
                         pass_start_args: false,
+                        env: vec![],
+                        path: vec![],
+                        command: vec![s("foo")],
                     }
                 ),
                 vec!["run", "--name", "shawl", "--restart-if-not", "0"],
@@ -1388,8 +1601,10 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         log_dir: None,
-                        command: vec![s("foo")],
                         pass_start_args: false,
+                        env: vec![],
+                        path: vec![],
+                        command: vec![s("foo")],
                     }
                 ),
                 vec!["run", "--name", "shawl", "--restart-if-not", "1,10"],
@@ -1411,8 +1626,10 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         log_dir: None,
-                        command: vec![s("foo")],
                         pass_start_args: false,
+                        env: vec![],
+                        path: vec![],
+                        command: vec![s("foo")],
                     }
                 ),
                 vec!["run", "--name", "shawl", "--pass", "0"],
@@ -1434,8 +1651,10 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         log_dir: None,
-                        command: vec![s("foo")],
                         pass_start_args: false,
+                        env: vec![],
+                        path: vec![],
+                        command: vec![s("foo")],
                     }
                 ),
                 vec!["run", "--name", "shawl", "--pass", "1,10"],
@@ -1457,8 +1676,10 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         log_dir: None,
-                        command: vec![s("foo")],
                         pass_start_args: false,
+                        env: vec![],
+                        path: vec![],
+                        command: vec![s("foo")],
                     }
                 ),
                 vec!["run", "--name", "shawl", "--stop-timeout", "3000"],
@@ -1480,8 +1701,10 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         log_dir: None,
-                        command: vec![s("foo")],
                         pass_start_args: false,
+                        env: vec![],
+                        path: vec![],
+                        command: vec![s("foo")],
                     }
                 ),
                 vec!["run", "--name", "shawl", "--cwd", "C:/foo"],
@@ -1503,14 +1726,15 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         log_dir: None,
-                        command: vec![s("foo")],
                         pass_start_args: false,
+                        env: vec![],
+                        path: vec![],
+                        command: vec![s("foo")],
                     }
                 ),
                 vec!["run", "--name", "shawl", "--cwd", "\"C:/Program Files/foo\""],
             );
         }
-
 
         it "handles --no-log" {
             assert_eq!(
@@ -1527,8 +1751,10 @@ speculate::speculate! {
                         no_log: true,
                         no_log_cmd: false,
                         log_dir: None,
-                        command: vec![s("foo")],
                         pass_start_args: false,
+                        env: vec![],
+                        path: vec![],
+                        command: vec![s("foo")],
                     }
                 ),
                 vec!["run", "--name", "shawl", "--no-log"],
@@ -1549,8 +1775,10 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: true,
                         log_dir: None,
-                        command: vec![s("foo")],
                         pass_start_args: false,
+                        env: vec![],
+                        path: vec![],
+                        command: vec![s("foo")],
                     }
                 ),
                 vec!["run", "--name", "shawl", "--no-log-cmd"],
@@ -1572,8 +1800,10 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         log_dir: Some("C:/foo".to_string()),
-                        command: vec![s("foo")],
                         pass_start_args: false,
+                        env: vec![],
+                        path: vec![],
+                        command: vec![s("foo")],
                     }
                 ),
                 vec!["run", "--name", "shawl", "--log-dir", "C:/foo"],
@@ -1595,8 +1825,10 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         log_dir: Some("C:/foo bar/hello".to_string()),
-                        command: vec![s("foo")],
                         pass_start_args: false,
+                        env: vec![],
+                        path: vec![],
+                        command: vec![s("foo")],
                     }
                 ),
                 vec!["run", "--name", "shawl", "--log-dir", "\"C:/foo bar/hello\""],
@@ -1618,11 +1850,163 @@ speculate::speculate! {
                         no_log: false,
                         no_log_cmd: false,
                         log_dir: None,
-                        command: vec![s("foo")],
                         pass_start_args: true,
+                        env: vec![],
+                        path: vec![],
+                        command: vec![s("foo")],
                     }
                 ),
                 vec!["run", "--name", "shawl", "--pass-start-args"],
+            );
+        }
+
+        it "handles --env without spaces" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &None,
+                    &CommonOpts {
+                        pass: None,
+                        restart: false,
+                        no_restart: false,
+                        restart_if: vec![],
+                        restart_if_not: vec![],
+                        stop_timeout: None,
+                        no_log: false,
+                        no_log_cmd: false,
+                        log_dir: None,
+                        pass_start_args: false,
+                        env: vec![(s("FOO"), s("bar"))],
+                        path: vec![],
+                        command: vec![s("foo")],
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--env", "FOO=bar"],
+            );
+        }
+
+        it "handles --env with spaces" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &None,
+                    &CommonOpts {
+                        pass: None,
+                        restart: false,
+                        no_restart: false,
+                        restart_if: vec![],
+                        restart_if_not: vec![],
+                        stop_timeout: None,
+                        no_log: false,
+                        no_log_cmd: false,
+                        log_dir: None,
+                        pass_start_args: false,
+                        env: vec![(s("FOO"), s("bar baz"))],
+                        path: vec![],
+                        command: vec![s("foo")],
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--env", "\"FOO=bar baz\""],
+            );
+        }
+
+        it "handles --env multiple times" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &None,
+                    &CommonOpts {
+                        pass: None,
+                        restart: false,
+                        no_restart: false,
+                        restart_if: vec![],
+                        restart_if_not: vec![],
+                        stop_timeout: None,
+                        no_log: false,
+                        no_log_cmd: false,
+                        log_dir: None,
+                        pass_start_args: false,
+                        env: vec![(s("FOO"), s("1")), (s("BAR"), s("2"))],
+                        path: vec![],
+                        command: vec![s("foo")],
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--env", "FOO=1", "--env", "BAR=2"],
+            );
+        }
+
+        it "handles --path without spaces" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &None,
+                    &CommonOpts {
+                        pass: None,
+                        restart: false,
+                        no_restart: false,
+                        restart_if: vec![],
+                        restart_if_not: vec![],
+                        stop_timeout: None,
+                        no_log: false,
+                        no_log_cmd: false,
+                        log_dir: None,
+                        pass_start_args: false,
+                        env: vec![],
+                        path: vec![s("C:/foo")],
+                        command: vec![s("foo")],
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--path", "C:/foo"],
+            );
+        }
+
+        it "handles --path with spaces" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &None,
+                    &CommonOpts {
+                        pass: None,
+                        restart: false,
+                        no_restart: false,
+                        restart_if: vec![],
+                        restart_if_not: vec![],
+                        stop_timeout: None,
+                        no_log: false,
+                        no_log_cmd: false,
+                        log_dir: None,
+                        pass_start_args: false,
+                        env: vec![],
+                        path: vec![s("C:/foo bar")],
+                        command: vec![s("foo")],
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--path", "\"C:/foo bar\""],
+            );
+        }
+
+        it "handles --path multiple times" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &None,
+                    &CommonOpts {
+                        pass: None,
+                        restart: false,
+                        no_restart: false,
+                        restart_if: vec![],
+                        restart_if_not: vec![],
+                        stop_timeout: None,
+                        no_log: false,
+                        no_log_cmd: false,
+                        log_dir: None,
+                        pass_start_args: false,
+                        env: vec![],
+                        path: vec![s("C:/foo"), s("C:/bar")],
+                        command: vec![s("foo")],
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--path", "C:/foo", "--path", "C:/bar"],
             );
         }
     }

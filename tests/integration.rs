@@ -54,6 +54,7 @@ speculate::speculate! {
     before {
         run_cmd(&["sc", "stop", "shawl"]);
         run_cmd(&["sc", "delete", "shawl"]);
+        delete_log();
     }
 
     after {
@@ -143,8 +144,6 @@ speculate::speculate! {
         }
 
         it "logs command output by default" {
-            delete_log();
-
             run_shawl(&["add", "--name", "shawl", "--", &child()]);
             run_cmd(&["sc", "start", "shawl"]);
             run_cmd(&["sc", "stop", "shawl"]);
@@ -155,8 +154,6 @@ speculate::speculate! {
         }
 
         it "disables all logging with --no-log" {
-            delete_log();
-
             run_shawl(&["add", "--name", "shawl", "--no-log", "--", &child()]);
             run_cmd(&["sc", "start", "shawl"]);
             run_cmd(&["sc", "stop", "shawl"]);
@@ -165,8 +162,6 @@ speculate::speculate! {
         }
 
         it "disables command logging with --no-log-cmd" {
-            delete_log();
-
             run_shawl(&["add", "--name", "shawl", "--no-log-cmd", "--", &child()]);
             run_cmd(&["sc", "start", "shawl"]);
             run_cmd(&["sc", "stop", "shawl"]);
@@ -176,8 +171,6 @@ speculate::speculate! {
         }
 
         it "creates log file in custom dir with --log-dir" {
-            delete_log();
-
             run_shawl(&["add", "--name", "shawl", "--log-dir", &log_custom_dir(), "--", &child()]);
             run_cmd(&["sc", "start", "shawl"]);
             run_cmd(&["sc", "stop", "shawl"]);
@@ -197,7 +190,6 @@ speculate::speculate! {
         }
 
         it "can resolve relative commands with bare executable name and --cwd" {
-            delete_log();
             std::fs::create_dir(log_custom_dir()).unwrap();
             std::fs::copy(child(), format!("{}/shawl-child-copy.exe", log_custom_dir())).unwrap();
 
@@ -209,6 +201,34 @@ speculate::speculate! {
             // Example log content, without escaping: "PATH: C:\tmp;\\?\C:\git\shawl\target"
             let pattern = regex::Regex::new(
                 &format!(r#"PATH: .+{}"#, &log_custom_dir().replace("/", "\\").replace("\\", "\\\\\\\\"))
+            ).unwrap();
+            assert!(pattern.is_match(&log));
+        }
+
+        it "adds directories to the PATH from --path" {
+            std::fs::create_dir(log_custom_dir()).unwrap();
+            let extra_path = env!("CARGO_MANIFEST_DIR");
+
+            run_shawl(&["add", "--name", "shawl", "--path", extra_path, "--", &child()]);
+            run_cmd(&["sc", "start", "shawl"]);
+            run_cmd(&["sc", "stop", "shawl"]);
+
+            let log = std::fs::read_to_string(log_file()).unwrap();
+            // Example log content, without escaping: "PATH: C:\tmp;\\?\C:\git\shawl\target"
+            let pattern = regex::Regex::new(
+                &format!(r#"PATH: .+{}"#, &extra_path.replace("/", "\\").replace("\\", "\\\\\\\\"))
+            ).unwrap();
+            assert!(pattern.is_match(&log));
+        }
+
+        it "loads environment variables from --env" {
+            run_shawl(&["add", "--name", "shawl", "--env", "SHAWL_FROM_CLI=custom value", "--", &child()]);
+            run_cmd(&["sc", "start", "shawl"]);
+            run_cmd(&["sc", "stop", "shawl"]);
+
+            let log = std::fs::read_to_string(log_file()).unwrap();
+            let pattern = regex::Regex::new(
+                r#"env\.SHAWL_FROM_CLI: Ok\(\\"custom value\\"\)"#
             ).unwrap();
             assert!(pattern.is_match(&log));
         }

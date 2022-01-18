@@ -2,12 +2,14 @@
 
 * Added `--log-dir`.
   (Contributed by [oscarbailey-tc](https://github.com/mtkennerly/shawl/pull/19))
-* When a custom `--cwd` is set, automatically add it to the command's PATH
-  so that commands written as relative paths can be resolved in some cases.
-  Specifically, assuming there is a `C:\foo\bar\baz.exe`, then `--cwd C:\foo\bar -- baz.exe`
-  will work now, but `--cwd C:\foo -- bar\baz.exe` still will not work, because the PATH
-  only helps to resolve executable names, not subfolder names.
 * Added version to executable properties.
+* Added `--env`.
+* Added `--path`.
+* When a custom `--cwd` is set, it is now automatically added to the command's
+  PATH to make it easier to write some commands. Specifically, assuming there
+  is a `C:\foo\bar\baz.exe`, then `--cwd C:\foo\bar -- baz.exe` will work now,
+  but `--cwd C:\foo -- bar\baz.exe` still will not work, because the PATH only
+  helps to resolve executable names, not subfolder names.
 
 ## v1.0.0 (2021-05-20)
 
