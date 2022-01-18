@@ -14,7 +14,6 @@ options from the command that you'd like it to run):
 
 * Using Shawl's `add` command:
   * `shawl add --name my-app -- C:/path/my-app.exe`
-<!--  * With a specific working directory: `shawl add --name my-app --cwd C:/path -- my-app.exe` -->
 * Using the Windows `sc` command for more control:
   * `sc create my-app binPath= "C:/path/shawl.exe run -- C:/path/my-app.exe"`
 * Then start or configure the service as normal:
