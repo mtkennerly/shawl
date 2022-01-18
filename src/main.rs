@@ -60,14 +60,14 @@ struct CommonOpts {
     no_log_cmd: bool,
 
     /// Write log file to a custom directory. This directory will be created if it doesn't exist.
-    #[structopt(long, parse(try_from_str = parse_ensured_directory))]
+    #[structopt(long, value_name = "path", parse(try_from_str = parse_ensured_directory))]
     log_dir: Option<String>,
 
     /// Append the service start arguments to the command
     #[structopt(long)]
     pass_start_args: bool,
 
-    /// Additional environment variable (repeatable)
+    /// Additional environment variable in the format 'KEY=value' (repeatable)
     #[structopt(long, number_of_values = 1, parse(try_from_str = parse_env_var))]
     env: Vec<(String, String)>,
 

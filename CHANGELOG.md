@@ -1,8 +1,8 @@
-## Unreleased
+## v1.1.0 (2022-01-18)
 
+* Added version to executable properties.
 * Added `--log-dir`.
   (Contributed by [oscarbailey-tc](https://github.com/mtkennerly/shawl/pull/19))
-* Added version to executable properties.
 * Added `--env`.
 * Added `--path`.
 * When a custom `--cwd` is set, it is now automatically added to the command's
