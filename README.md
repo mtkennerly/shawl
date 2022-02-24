@@ -62,6 +62,19 @@ change the account used by the service instead.
   It's portable, so you can simply download it and put it anywhere
   without going through an installer.
 * If you have Rust installed, you can run `cargo install shawl`.
+* If you have [Scoop](https://scoop.sh), you can install by running:
+
+  ```
+  scoop bucket add extras
+  scoop install shawl
+  ```
+
+  To update, run:
+
+  ```
+  scoop update
+  scoop update shawl
+  ```
 
 ## CLI
 ```console
