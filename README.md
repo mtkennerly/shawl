@@ -1,9 +1,5 @@
 # Shawl
 
-[![Build Status](https://travis-ci.org/mtkennerly/shawl.svg?branch=master)](https://travis-ci.org/mtkennerly/shawl)
-[![Version](https://img.shields.io/crates/v/shawl)](https://crates.io/crates/shawl)
-[![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
 Shawl is a wrapper for running arbitrary programs as Windows services,
 written in Rust. It handles the Windows service API for you so that your
 program only needs to respond to ctrl-C/SIGINT. If you're creating a project
