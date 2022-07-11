@@ -200,7 +200,7 @@ speculate::speculate! {
             let log = std::fs::read_to_string(log_file()).unwrap();
             // Example log content, without escaping: "PATH: C:\tmp;\\?\C:\git\shawl\target"
             let pattern = regex::Regex::new(
-                &format!(r#"PATH: .+{}"#, &log_custom_dir().replace("/", "\\").replace("\\", "\\\\\\\\"))
+                &format!(r#"PATH: .+{}"#, &log_custom_dir().replace('/', "\\").replace('\\', "\\\\\\\\"))
             ).unwrap();
             assert!(pattern.is_match(&log));
         }
@@ -216,7 +216,7 @@ speculate::speculate! {
             let log = std::fs::read_to_string(log_file()).unwrap();
             // Example log content, without escaping: "PATH: C:\tmp;\\?\C:\git\shawl\target"
             let pattern = regex::Regex::new(
-                &format!(r#"PATH: .+{}"#, &extra_path.replace("/", "\\").replace("\\", "\\\\\\\\"))
+                &format!(r#"PATH: .+{}"#, &extra_path.replace('/', "\\").replace('\\', "\\\\\\\\"))
             ).unwrap();
             assert!(pattern.is_match(&log));
         }
