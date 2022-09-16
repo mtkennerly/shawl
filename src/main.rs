@@ -833,6 +833,13 @@ speculate::speculate! {
                 );
             }
 
+            it "rejects --pass without value" {
+                check_args_err(
+                    &["shawl", "run", "--pass", "--", "foo"],
+                    structopt::clap::ErrorKind::UnknownArgument,
+                );
+            }
+
             it "accepts --restart" {
                 check_args(
                     &["shawl", "run", "--restart", "--", "foo"],
@@ -941,6 +948,13 @@ speculate::speculate! {
                 );
             }
 
+            it "rejects --restart-if without value" {
+                check_args_err(
+                    &["shawl", "run", "--restart-if", "--", "foo"],
+                    structopt::clap::ErrorKind::UnknownArgument,
+                );
+            }
+
             it "accepts --restart-if-not" {
                 check_args(
                     &["shawl", "run", "--restart-if-not", "1,2", "--", "foo"],
@@ -992,6 +1006,13 @@ speculate::speculate! {
                             }
                         }
                     },
+                );
+            }
+
+            it "rejects --restart-if-not without value" {
+                check_args_err(
+                    &["shawl", "run", "--restart-if-not", "--", "foo"],
+                    structopt::clap::ErrorKind::UnknownArgument,
                 );
             }
 

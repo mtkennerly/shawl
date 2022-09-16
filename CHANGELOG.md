@@ -1,6 +1,7 @@
 ## Unreleased
 
 * Fixed `--pass`, `--restart-if`, and `--restart-if-not` not allowing a leading negative number.
+* Fixed `--pass`, `--restart-if`, and `--restart-if-not` not requiring a value.
 
 ## v1.1.0 (2022-01-18)
 
