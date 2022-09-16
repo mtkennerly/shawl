@@ -22,7 +22,13 @@ fn parse_env_var(value: &str) -> Result<(String, String), Box<dyn std::error::Er
 #[derive(structopt::StructOpt, Clone, Debug, PartialEq)]
 struct CommonOpts {
     /// Exit codes that should be considered successful (comma-separated) [default: 0]
-    #[structopt(long, value_name = "codes", use_delimiter(true))]
+    #[structopt(
+        long,
+        value_name = "codes",
+        use_delimiter(true),
+        number_of_values = 1,
+        allow_hyphen_values(true)
+    )]
     pass: Option<Vec<i32>>,
 
     /// Always restart the command regardless of the exit code
@@ -39,11 +45,23 @@ struct CommonOpts {
     no_restart: bool,
 
     /// Restart the command if the exit code is one of these (comma-separated)
-    #[structopt(long, value_name = "codes", use_delimiter(true))]
+    #[structopt(
+        long,
+        value_name = "codes",
+        use_delimiter(true),
+        number_of_values = 1,
+        allow_hyphen_values(true)
+    )]
     restart_if: Vec<i32>,
 
     /// Restart the command if the exit code is not one of these (comma-separated)
-    #[structopt(long, value_name = "codes", use_delimiter(true))]
+    #[structopt(
+        long,
+        value_name = "codes",
+        use_delimiter(true),
+        number_of_values = 1,
+        allow_hyphen_values(true)
+    )]
     restart_if_not: Vec<i32>,
 
     /// How long to wait in milliseconds between sending the wrapped process
@@ -788,6 +806,33 @@ speculate::speculate! {
                 );
             }
 
+            it "accepts --pass with leading negative" {
+                check_args(
+                    &["shawl", "run", "--pass", "-1", "--", "foo"],
+                    Cli {
+                        sub: Subcommand::Run {
+                            name: s("Shawl"),
+                            cwd: None,
+                            common: CommonOpts {
+                                pass: Some(vec![-1]),
+                                restart: false,
+                                no_restart: false,
+                                restart_if: vec![],
+                                restart_if_not: vec![],
+                                stop_timeout: None,
+                                no_log: false,
+                                no_log_cmd: false,
+                                log_dir: None,
+                                pass_start_args: false,
+                                env: vec![],
+                                path: vec![],
+                                command: vec![s("foo")],
+                            }
+                        }
+                    },
+                );
+            }
+
             it "accepts --restart" {
                 check_args(
                     &["shawl", "run", "--restart", "--", "foo"],
@@ -869,6 +914,33 @@ speculate::speculate! {
                 );
             }
 
+            it "accepts --restart-if with leading negative" {
+                check_args(
+                    &["shawl", "run", "--restart-if", "-1", "--", "foo"],
+                    Cli {
+                        sub: Subcommand::Run {
+                            name: s("Shawl"),
+                            cwd: None,
+                            common: CommonOpts {
+                                pass: None,
+                                restart: false,
+                                no_restart: false,
+                                restart_if: vec![-1],
+                                restart_if_not: vec![],
+                                stop_timeout: None,
+                                no_log: false,
+                                no_log_cmd: false,
+                                log_dir: None,
+                                pass_start_args: false,
+                                env: vec![],
+                                path: vec![],
+                                command: vec![s("foo")],
+                            }
+                        }
+                    },
+                );
+            }
+
             it "accepts --restart-if-not" {
                 check_args(
                     &["shawl", "run", "--restart-if-not", "1,2", "--", "foo"],
@@ -882,6 +954,33 @@ speculate::speculate! {
                                 no_restart: false,
                                 restart_if: vec![],
                                 restart_if_not: vec![1, 2],
+                                stop_timeout: None,
+                                no_log: false,
+                                no_log_cmd: false,
+                                log_dir: None,
+                                pass_start_args: false,
+                                env: vec![],
+                                path: vec![],
+                                command: vec![s("foo")],
+                            }
+                        }
+                    },
+                );
+            }
+
+            it "accepts --restart-if-not with leading negative" {
+                check_args(
+                    &["shawl", "run", "--restart-if-not", "-1", "--", "foo"],
+                    Cli {
+                        sub: Subcommand::Run {
+                            name: s("Shawl"),
+                            cwd: None,
+                            common: CommonOpts {
+                                pass: None,
+                                restart: false,
+                                no_restart: false,
+                                restart_if: vec![],
+                                restart_if_not: vec![-1],
                                 stop_timeout: None,
                                 no_log: false,
                                 no_log_cmd: false,
