@@ -2,6 +2,8 @@
 
 * Fixed `--pass`, `--restart-if`, and `--restart-if-not` not allowing a leading negative number.
 * Fixed `--pass`, `--restart-if`, and `--restart-if-not` not requiring a value.
+* Fixed `--no-restart`, `--restart-if`, and `--restart-if-not` not being marked as mutually exclusive.
+  They had only been marked as exclusive with `--pass`.
 
 ## v1.1.0 (2022-01-18)
 

@@ -41,12 +41,20 @@ struct CommonOpts {
     restart: bool,
 
     /// Never restart the command regardless of the exit code
-    #[structopt(long)]
+    #[structopt(
+        long,
+        conflicts_with("restart"),
+        conflicts_with("restart-if"),
+        conflicts_with("restart-if-not")
+    )]
     no_restart: bool,
 
     /// Restart the command if the exit code is one of these (comma-separated)
     #[structopt(
         long,
+        conflicts_with("restart"),
+        conflicts_with("no-restart"),
+        conflicts_with("restart-if-not"),
         value_name = "codes",
         use_delimiter(true),
         number_of_values = 1,
@@ -57,6 +65,9 @@ struct CommonOpts {
     /// Restart the command if the exit code is not one of these (comma-separated)
     #[structopt(
         long,
+        conflicts_with("restart"),
+        conflicts_with("no-restart"),
+        conflicts_with("restart-if"),
         value_name = "codes",
         use_delimiter(true),
         number_of_values = 1,
@@ -867,6 +878,19 @@ speculate::speculate! {
                 );
             }
 
+            it "rejects --restart with conflicting options" {
+                for case in [
+                    vec!["shawl", "run", "--restart", "--no-restart", "--", "foo"],
+                    vec!["shawl", "run", "--restart", "--restart-if", "1", "--", "foo"],
+                    vec!["shawl", "run", "--restart", "--restart-if-not", "1", "--", "foo"],
+                ] {
+                    check_args_err(
+                        &case,
+                        structopt::clap::ErrorKind::ArgumentConflict,
+                    );
+                }
+            }
+
             it "accepts --no-restart" {
                 check_args(
                     &["shawl", "run", "--no-restart", "--", "foo"],
@@ -892,6 +916,19 @@ speculate::speculate! {
                         }
                     },
                 );
+            }
+
+            it "rejects --no-restart with conflicting options" {
+                for case in [
+                    vec!["shawl", "run", "--no-restart", "--restart", "--", "foo"],
+                    vec!["shawl", "run", "--no-restart", "--restart-if", "1", "--", "foo"],
+                    vec!["shawl", "run", "--no-restart", "--restart-if-not", "1", "--", "foo"],
+                ] {
+                    check_args_err(
+                        &case,
+                        structopt::clap::ErrorKind::ArgumentConflict,
+                    );
+                }
             }
 
             it "accepts --restart-if" {
@@ -955,6 +992,19 @@ speculate::speculate! {
                 );
             }
 
+            it "rejects --restart-if with conflicting options" {
+                for case in [
+                    vec!["shawl", "run", "--restart-if", "0", "--restart", "--", "foo"],
+                    vec!["shawl", "run", "--restart-if", "0", "--no-restart", "--", "foo"],
+                    vec!["shawl", "run", "--restart-if", "0", "--restart-if-not", "1", "--", "foo"],
+                ] {
+                    check_args_err(
+                        &case,
+                        structopt::clap::ErrorKind::ArgumentConflict,
+                    );
+                }
+            }
+
             it "accepts --restart-if-not" {
                 check_args(
                     &["shawl", "run", "--restart-if-not", "1,2", "--", "foo"],
@@ -1014,6 +1064,19 @@ speculate::speculate! {
                     &["shawl", "run", "--restart-if-not", "--", "foo"],
                     structopt::clap::ErrorKind::UnknownArgument,
                 );
+            }
+
+            it "rejects --restart-if-not with conflicting options" {
+                for case in [
+                    vec!["shawl", "run", "--restart-if-not", "0", "--restart", "--", "foo"],
+                    vec!["shawl", "run", "--restart-if-not", "0", "--no-restart", "--", "foo"],
+                    vec!["shawl", "run", "--restart-if-not", "0", "--restart-if", "1", "--", "foo"],
+                ] {
+                    check_args_err(
+                        &case,
+                        structopt::clap::ErrorKind::ArgumentConflict,
+                    );
+                }
             }
 
             it "accepts --stop-timeout" {
