@@ -7,6 +7,7 @@ description = "Windows service wrapper for arbitrary commands"
 repository = "https://github.com/mtkennerly/shawl"
 readme = "README.md"
 license = "MIT"
+default-run = "shawl"
 
 [dependencies]
 ctrlc = "3.1.3"
