@@ -133,20 +133,20 @@ speculate::speculate! {
                 construct_shawl_run_args(
                     &s("shawl"),
                     &None,
+                    &CommonOpts::default()
+                ),
+                vec!["run", "--name", "shawl"],
+            );
+        }
+
+        it "does not use the command" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &None,
                     &CommonOpts {
-                        pass: None,
-                        restart: false,
-                        no_restart: false,
-                        restart_if: vec![],
-                        restart_if_not: vec![],
-                        stop_timeout: None,
-                        no_log: false,
-                        no_log_cmd: false,
-                        log_dir: None,
-                        pass_start_args: false,
-                        env: vec![],
-                        path: vec![],
                         command: vec![s("foo")],
+                        ..Default::default()
                     }
                 ),
                 vec!["run", "--name", "shawl"],
@@ -158,21 +158,7 @@ speculate::speculate! {
                 construct_shawl_run_args(
                     &s("C:/Program Files/shawl"),
                     &None,
-                    &CommonOpts {
-                        pass: None,
-                        restart: false,
-                        no_restart: false,
-                        restart_if: vec![],
-                        restart_if_not: vec![],
-                        stop_timeout: None,
-                        no_log: false,
-                        no_log_cmd: false,
-                        log_dir: None,
-                        pass_start_args: false,
-                        env: vec![],
-                        path: vec![],
-                        command: vec![s("foo")],
-                    }
+                    &CommonOpts::default()
                 ),
                 vec!["run", "--name", "\"C:/Program Files/shawl\""],
             );
@@ -184,19 +170,8 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: None,
                         restart: true,
-                        no_restart: false,
-                        restart_if: vec![],
-                        restart_if_not: vec![],
-                        stop_timeout: None,
-                        no_log: false,
-                        no_log_cmd: false,
-                        log_dir: None,
-                        pass_start_args: false,
-                        env: vec![],
-                        path: vec![],
-                        command: vec![s("foo")],
+                        ..Default::default()
                     }
                 ),
                 vec!["run", "--name", "shawl", "--restart"],
@@ -209,19 +184,8 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: None,
-                        restart: false,
                         no_restart: true,
-                        restart_if: vec![],
-                        restart_if_not: vec![],
-                        stop_timeout: None,
-                        no_log: false,
-                        no_log_cmd: false,
-                        log_dir: None,
-                        pass_start_args: false,
-                        env: vec![],
-                        path: vec![],
-                        command: vec![s("foo")],
+                        ..Default::default()
                     }
                 ),
                 vec!["run", "--name", "shawl", "--no-restart"],
@@ -234,19 +198,8 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: None,
-                        restart: false,
-                        no_restart: false,
                         restart_if: vec![0],
-                        restart_if_not: vec![],
-                        stop_timeout: None,
-                        no_log: false,
-                        no_log_cmd: false,
-                        log_dir: None,
-                        pass_start_args: false,
-                        env: vec![],
-                        path: vec![],
-                        command: vec![s("foo")],
+                        ..Default::default()
                     }
                 ),
                 vec!["run", "--name", "shawl", "--restart-if", "0"],
@@ -259,19 +212,8 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: None,
-                        restart: false,
-                        no_restart: false,
                         restart_if: vec![1, 10],
-                        restart_if_not: vec![],
-                        stop_timeout: None,
-                        no_log: false,
-                        no_log_cmd: false,
-                        log_dir: None,
-                        pass_start_args: false,
-                        env: vec![],
-                        path: vec![],
-                        command: vec![s("foo")],
+                        ..Default::default()
                     }
                 ),
                 vec!["run", "--name", "shawl", "--restart-if", "1,10"],
@@ -284,19 +226,8 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: None,
-                        restart: false,
-                        no_restart: false,
-                        restart_if: vec![],
                         restart_if_not: vec![0],
-                        stop_timeout: None,
-                        no_log: false,
-                        no_log_cmd: false,
-                        log_dir: None,
-                        pass_start_args: false,
-                        env: vec![],
-                        path: vec![],
-                        command: vec![s("foo")],
+                        ..Default::default()
                     }
                 ),
                 vec!["run", "--name", "shawl", "--restart-if-not", "0"],
@@ -309,19 +240,8 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: None,
-                        restart: false,
-                        no_restart: false,
-                        restart_if: vec![],
                         restart_if_not: vec![1, 10],
-                        stop_timeout: None,
-                        no_log: false,
-                        no_log_cmd: false,
-                        log_dir: None,
-                        pass_start_args: false,
-                        env: vec![],
-                        path: vec![],
-                        command: vec![s("foo")],
+                        ..Default::default()
                     }
                 ),
                 vec!["run", "--name", "shawl", "--restart-if-not", "1,10"],
@@ -335,18 +255,7 @@ speculate::speculate! {
                     &None,
                     &CommonOpts {
                         pass: Some(vec![0]),
-                        restart: false,
-                        no_restart: false,
-                        restart_if: vec![],
-                        restart_if_not: vec![],
-                        stop_timeout: None,
-                        no_log: false,
-                        no_log_cmd: false,
-                        log_dir: None,
-                        pass_start_args: false,
-                        env: vec![],
-                        path: vec![],
-                        command: vec![s("foo")],
+                        ..Default::default()
                     }
                 ),
                 vec!["run", "--name", "shawl", "--pass", "0"],
@@ -360,18 +269,7 @@ speculate::speculate! {
                     &None,
                     &CommonOpts {
                         pass: Some(vec![1, 10]),
-                        restart: false,
-                        no_restart: false,
-                        restart_if: vec![],
-                        restart_if_not: vec![],
-                        stop_timeout: None,
-                        no_log: false,
-                        no_log_cmd: false,
-                        log_dir: None,
-                        pass_start_args: false,
-                        env: vec![],
-                        path: vec![],
-                        command: vec![s("foo")],
+                        ..Default::default()
                     }
                 ),
                 vec!["run", "--name", "shawl", "--pass", "1,10"],
@@ -384,19 +282,8 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: None,
-                        restart: false,
-                        no_restart: false,
-                        restart_if: vec![],
-                        restart_if_not: vec![],
                         stop_timeout: Some(3000),
-                        no_log: false,
-                        no_log_cmd: false,
-                        log_dir: None,
-                        pass_start_args: false,
-                        env: vec![],
-                        path: vec![],
-                        command: vec![s("foo")],
+                        ..Default::default()
                     }
                 ),
                 vec!["run", "--name", "shawl", "--stop-timeout", "3000"],
@@ -408,21 +295,7 @@ speculate::speculate! {
                 construct_shawl_run_args(
                     &s("shawl"),
                     &Some(s("C:/foo")),
-                    &CommonOpts {
-                        pass: None,
-                        restart: false,
-                        no_restart: false,
-                        restart_if: vec![],
-                        restart_if_not: vec![],
-                        stop_timeout: None,
-                        no_log: false,
-                        no_log_cmd: false,
-                        log_dir: None,
-                        pass_start_args: false,
-                        env: vec![],
-                        path: vec![],
-                        command: vec![s("foo")],
-                    }
+                    &CommonOpts::default()
                 ),
                 vec!["run", "--name", "shawl", "--cwd", "C:/foo"],
             );
@@ -433,21 +306,7 @@ speculate::speculate! {
                 construct_shawl_run_args(
                     &s("shawl"),
                     &Some(s("C:/Program Files/foo")),
-                    &CommonOpts {
-                        pass: None,
-                        restart: false,
-                        no_restart: false,
-                        restart_if: vec![],
-                        restart_if_not: vec![],
-                        stop_timeout: None,
-                        no_log: false,
-                        no_log_cmd: false,
-                        log_dir: None,
-                        pass_start_args: false,
-                        env: vec![],
-                        path: vec![],
-                        command: vec![s("foo")],
-                    }
+                    &CommonOpts::default()
                 ),
                 vec!["run", "--name", "shawl", "--cwd", "\"C:/Program Files/foo\""],
             );
@@ -459,19 +318,8 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: None,
-                        restart: false,
-                        no_restart: false,
-                        restart_if: vec![],
-                        restart_if_not: vec![],
-                        stop_timeout: None,
                         no_log: true,
-                        no_log_cmd: false,
-                        log_dir: None,
-                        pass_start_args: false,
-                        env: vec![],
-                        path: vec![],
-                        command: vec![s("foo")],
+                        ..Default::default()
                     }
                 ),
                 vec!["run", "--name", "shawl", "--no-log"],
@@ -483,19 +331,8 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: None,
-                        restart: false,
-                        no_restart: false,
-                        restart_if: vec![],
-                        restart_if_not: vec![],
-                        stop_timeout: None,
-                        no_log: false,
                         no_log_cmd: true,
-                        log_dir: None,
-                        pass_start_args: false,
-                        env: vec![],
-                        path: vec![],
-                        command: vec![s("foo")],
+                        ..Default::default()
                     }
                 ),
                 vec!["run", "--name", "shawl", "--no-log-cmd"],
@@ -508,19 +345,8 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: None,
-                        restart: false,
-                        no_restart: false,
-                        restart_if: vec![],
-                        restart_if_not: vec![],
-                        stop_timeout: None,
-                        no_log: false,
-                        no_log_cmd: false,
                         log_dir: Some("C:/foo".to_string()),
-                        pass_start_args: false,
-                        env: vec![],
-                        path: vec![],
-                        command: vec![s("foo")],
+                        ..Default::default()
                     }
                 ),
                 vec!["run", "--name", "shawl", "--log-dir", "C:/foo"],
@@ -533,19 +359,8 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: None,
-                        restart: false,
-                        no_restart: false,
-                        restart_if: vec![],
-                        restart_if_not: vec![],
-                        stop_timeout: None,
-                        no_log: false,
-                        no_log_cmd: false,
                         log_dir: Some("C:/foo bar/hello".to_string()),
-                        pass_start_args: false,
-                        env: vec![],
-                        path: vec![],
-                        command: vec![s("foo")],
+                        ..Default::default()
                     }
                 ),
                 vec!["run", "--name", "shawl", "--log-dir", "\"C:/foo bar/hello\""],
@@ -558,19 +373,8 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: None,
-                        restart: false,
-                        no_restart: false,
-                        restart_if: vec![],
-                        restart_if_not: vec![],
-                        stop_timeout: None,
-                        no_log: false,
-                        no_log_cmd: false,
-                        log_dir: None,
                         pass_start_args: true,
-                        env: vec![],
-                        path: vec![],
-                        command: vec![s("foo")],
+                        ..Default::default()
                     }
                 ),
                 vec!["run", "--name", "shawl", "--pass-start-args"],
@@ -583,19 +387,8 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: None,
-                        restart: false,
-                        no_restart: false,
-                        restart_if: vec![],
-                        restart_if_not: vec![],
-                        stop_timeout: None,
-                        no_log: false,
-                        no_log_cmd: false,
-                        log_dir: None,
-                        pass_start_args: false,
                         env: vec![(s("FOO"), s("bar"))],
-                        path: vec![],
-                        command: vec![s("foo")],
+                        ..Default::default()
                     }
                 ),
                 vec!["run", "--name", "shawl", "--env", "FOO=bar"],
@@ -608,19 +401,8 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: None,
-                        restart: false,
-                        no_restart: false,
-                        restart_if: vec![],
-                        restart_if_not: vec![],
-                        stop_timeout: None,
-                        no_log: false,
-                        no_log_cmd: false,
-                        log_dir: None,
-                        pass_start_args: false,
                         env: vec![(s("FOO"), s("bar baz"))],
-                        path: vec![],
-                        command: vec![s("foo")],
+                        ..Default::default()
                     }
                 ),
                 vec!["run", "--name", "shawl", "--env", "\"FOO=bar baz\""],
@@ -633,19 +415,8 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: None,
-                        restart: false,
-                        no_restart: false,
-                        restart_if: vec![],
-                        restart_if_not: vec![],
-                        stop_timeout: None,
-                        no_log: false,
-                        no_log_cmd: false,
-                        log_dir: None,
-                        pass_start_args: false,
                         env: vec![(s("FOO"), s("1")), (s("BAR"), s("2"))],
-                        path: vec![],
-                        command: vec![s("foo")],
+                        ..Default::default()
                     }
                 ),
                 vec!["run", "--name", "shawl", "--env", "FOO=1", "--env", "BAR=2"],
@@ -658,19 +429,8 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: None,
-                        restart: false,
-                        no_restart: false,
-                        restart_if: vec![],
-                        restart_if_not: vec![],
-                        stop_timeout: None,
-                        no_log: false,
-                        no_log_cmd: false,
-                        log_dir: None,
-                        pass_start_args: false,
-                        env: vec![],
                         path: vec![s("C:/foo")],
-                        command: vec![s("foo")],
+                        ..Default::default()
                     }
                 ),
                 vec!["run", "--name", "shawl", "--path", "C:/foo"],
@@ -683,19 +443,8 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: None,
-                        restart: false,
-                        no_restart: false,
-                        restart_if: vec![],
-                        restart_if_not: vec![],
-                        stop_timeout: None,
-                        no_log: false,
-                        no_log_cmd: false,
-                        log_dir: None,
-                        pass_start_args: false,
-                        env: vec![],
                         path: vec![s("C:/foo bar")],
-                        command: vec![s("foo")],
+                        ..Default::default()
                     }
                 ),
                 vec!["run", "--name", "shawl", "--path", "\"C:/foo bar\""],
@@ -708,19 +457,8 @@ speculate::speculate! {
                     &s("shawl"),
                     &None,
                     &CommonOpts {
-                        pass: None,
-                        restart: false,
-                        no_restart: false,
-                        restart_if: vec![],
-                        restart_if_not: vec![],
-                        stop_timeout: None,
-                        no_log: false,
-                        no_log_cmd: false,
-                        log_dir: None,
-                        pass_start_args: false,
-                        env: vec![],
                         path: vec![s("C:/foo"), s("C:/bar")],
-                        command: vec![s("foo")],
+                        ..Default::default()
                     }
                 ),
                 vec!["run", "--name", "shawl", "--path", "C:/foo", "--path", "C:/bar"],
