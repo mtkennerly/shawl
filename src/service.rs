@@ -1,0 +1,392 @@
+use crate::cli;
+use log::{debug, error, info};
+use std::io::BufRead;
+use windows_service::{
+    define_windows_service,
+    service::{
+        ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus,
+        ServiceType,
+    },
+    service_control_handler::{self, ServiceControlHandlerResult},
+    service_dispatcher,
+};
+
+const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
+
+define_windows_service!(ffi_service_main, service_main);
+
+enum ProcessStatus {
+    Running,
+    Exited(i32),
+    Terminated,
+}
+
+fn check_process(
+    child: &mut std::process::Child,
+) -> Result<ProcessStatus, Box<dyn std::error::Error>> {
+    match child.try_wait() {
+        Ok(None) => Ok(ProcessStatus::Running),
+        Ok(Some(status)) => match status.code() {
+            Some(code) => Ok(ProcessStatus::Exited(code)),
+            None => Ok(ProcessStatus::Terminated),
+        },
+        Err(e) => Err(Box::new(e)),
+    }
+}
+
+fn should_restart_exited_command(
+    code: i32,
+    restart: bool,
+    no_restart: bool,
+    restart_if: &[i32],
+    restart_if_not: &[i32],
+) -> bool {
+    if !restart_if.is_empty() {
+        restart_if.contains(&code)
+    } else if !restart_if_not.is_empty() {
+        !restart_if_not.contains(&code)
+    } else {
+        restart || !no_restart && code != 0
+    }
+}
+
+fn should_restart_terminated_command(restart: bool, _no_restart: bool) -> bool {
+    restart
+}
+
+pub fn run(name: String) -> windows_service::Result<()> {
+    service_dispatcher::start(name, ffi_service_main)
+}
+
+fn service_main(mut arguments: Vec<std::ffi::OsString>) {
+    unsafe {
+        // Windows services don't start with a console, so we have to
+        // allocate one in order to send ctrl-C to children.
+        if winapi::um::consoleapi::AllocConsole() == 0 {
+            error!(
+                "winapi AllocConsole failed with code {:?}",
+                winapi::um::errhandlingapi::GetLastError()
+            );
+        };
+    }
+    if !arguments.is_empty() {
+        // first argument is the service name
+        arguments.remove(0);
+    }
+    let _ = run_service(arguments);
+}
+
+#[allow(clippy::cognitive_complexity)]
+pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service::Result<()> {
+    let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
+    let cli = cli::evaluate_cli();
+    let (name, cwd, opts) = match cli.sub {
+        cli::Subcommand::Run {
+            name,
+            cwd,
+            common: opts,
+        } => (name, cwd, opts),
+        _ => {
+            // Can't get here.
+            return Ok(());
+        }
+    };
+    let pass = &opts.pass.unwrap_or_else(|| vec![0]);
+    let stop_timeout = &opts.stop_timeout.unwrap_or(3000_u64);
+    let mut service_exit_code = ServiceExitCode::NO_ERROR;
+
+    let ignore_ctrlc = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let ignore_ctrlc2 = ignore_ctrlc.clone();
+    ctrlc::set_handler(move || {
+        if !ignore_ctrlc2.load(std::sync::atomic::Ordering::SeqCst) {
+            std::process::abort();
+        }
+    })
+    .expect("Unable to create ctrl-C handler");
+
+    let event_handler = move |control_event| -> ServiceControlHandlerResult {
+        match control_event {
+            ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
+            ServiceControl::Stop => {
+                info!("Received stop event");
+                shutdown_tx.send(()).unwrap();
+                ServiceControlHandlerResult::NoError
+            }
+            ServiceControl::Shutdown => {
+                info!("Received shutdown event");
+                shutdown_tx.send(()).unwrap();
+                ServiceControlHandlerResult::NoError
+            }
+            _ => ServiceControlHandlerResult::NotImplemented,
+        }
+    };
+
+    let status_handle = service_control_handler::register(name, event_handler)?;
+
+    status_handle.set_service_status(ServiceStatus {
+        service_type: SERVICE_TYPE,
+        current_state: ServiceState::Running,
+        controls_accepted: ServiceControlAccept::STOP | ServiceControlAccept::SHUTDOWN,
+        exit_code: ServiceExitCode::NO_ERROR,
+        checkpoint: 0,
+        wait_hint: std::time::Duration::default(),
+        process_id: None,
+    })?;
+
+    let mut command = opts.command.into_iter();
+    let program = command.next().unwrap();
+    let mut args: Vec<_> = command.map(std::ffi::OsString::from).collect();
+    if opts.pass_start_args {
+        args.extend(start_arguments);
+    }
+
+    debug!("Entering main service loop");
+    'outer: loop {
+        info!("Launching command");
+        let should_log_cmd = !&opts.no_log_cmd;
+        let mut child_cmd = std::process::Command::new(&program);
+
+        child_cmd
+            .args(&args)
+            .stdout(if should_log_cmd {
+                std::process::Stdio::piped()
+            } else {
+                std::process::Stdio::null()
+            })
+            .stderr(if should_log_cmd {
+                std::process::Stdio::piped()
+            } else {
+                std::process::Stdio::null()
+            });
+        for (key, value) in &opts.env {
+            child_cmd.env(key, value);
+        }
+        if !opts.path.is_empty() {
+            child_cmd.env(
+                "PATH",
+                match std::env::var("PATH") {
+                    Ok(path) => format!("{};{}", path, &opts.path.join(";")),
+                    Err(_) => opts.path.join(";").to_string(),
+                },
+            );
+        }
+        if let Some(active_cwd) = &cwd {
+            child_cmd.current_dir(active_cwd);
+            child_cmd.env(
+                "PATH",
+                match std::env::var("PATH") {
+                    Ok(path) => format!("{};{}", path, active_cwd),
+                    Err(_) => active_cwd.to_string(),
+                },
+            );
+        }
+        let mut child = match child_cmd.spawn() {
+            Ok(c) => c,
+            Err(e) => {
+                error!("Unable to launch command: {}", e);
+                service_exit_code = match e.raw_os_error() {
+                    Some(win_code) => ServiceExitCode::Win32(win_code as u32),
+                    None => ServiceExitCode::Win32(winapi::shared::winerror::ERROR_PROCESS_ABORTED),
+                };
+                break;
+            }
+        };
+
+        // Log stdout.
+        let stdout_option = child.stdout.take();
+        let stdout_logger = std::thread::spawn(move || {
+            if !should_log_cmd {
+                return;
+            }
+            if let Some(stdout) = stdout_option {
+                std::io::BufReader::new(stdout)
+                    .lines()
+                    .for_each(|line| match line {
+                        Ok(ref x) if !x.is_empty() => debug!("stdout: {:?}", x),
+                        _ => (),
+                    });
+            }
+        });
+
+        // Log stderr.
+        let stderr_option = child.stderr.take();
+        let stderr_logger = std::thread::spawn(move || {
+            if !should_log_cmd {
+                return;
+            }
+            if let Some(stderr) = stderr_option {
+                std::io::BufReader::new(stderr)
+                    .lines()
+                    .for_each(|line| match line {
+                        Ok(ref x) if !x.is_empty() => debug!("stderr: {:?}", x),
+                        _ => (),
+                    });
+            }
+        });
+
+        'inner: loop {
+            match shutdown_rx.recv_timeout(std::time::Duration::from_secs(1)) {
+                Ok(_) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    status_handle.set_service_status(ServiceStatus {
+                        service_type: SERVICE_TYPE,
+                        current_state: ServiceState::StopPending,
+                        controls_accepted: ServiceControlAccept::empty(),
+                        exit_code: ServiceExitCode::NO_ERROR,
+                        checkpoint: 0,
+                        wait_hint: std::time::Duration::from_millis(
+                            opts.stop_timeout.unwrap_or(3000) + 1000,
+                        ),
+                        process_id: None,
+                    })?;
+
+                    ignore_ctrlc.store(true, std::sync::atomic::Ordering::SeqCst);
+                    info!("Sending ctrl-C to command");
+                    unsafe {
+                        if winapi::um::wincon::GenerateConsoleCtrlEvent(
+                            winapi::um::wincon::CTRL_C_EVENT,
+                            0,
+                        ) == 0
+                        {
+                            error!(
+                                "winapi GenerateConsoleCtrlEvent failed with code {:?}",
+                                winapi::um::errhandlingapi::GetLastError()
+                            );
+                        };
+                    }
+
+                    let start_time = std::time::Instant::now();
+                    loop {
+                        match check_process(&mut child) {
+                            Ok(ProcessStatus::Running) => {
+                                if start_time.elapsed().as_millis() < (*stop_timeout).into() {
+                                    std::thread::sleep(std::time::Duration::from_millis(50))
+                                } else {
+                                    info!("Killing command because stop timeout expired",);
+                                    let _ = child.kill();
+                                    service_exit_code = ServiceExitCode::NO_ERROR;
+                                    break;
+                                }
+                            }
+                            Ok(ProcessStatus::Exited(code)) => {
+                                info!(
+                                    "Command exited after {:?} ms with code {:?}",
+                                    start_time.elapsed().as_millis(),
+                                    code
+                                );
+                                service_exit_code = if pass.contains(&code) {
+                                    ServiceExitCode::NO_ERROR
+                                } else {
+                                    ServiceExitCode::ServiceSpecific(code as u32)
+                                };
+                                break;
+                            }
+                            _ => {
+                                info!("Command exited within stop timeout");
+                                break;
+                            }
+                        }
+                    }
+
+                    ignore_ctrlc.store(false, std::sync::atomic::Ordering::SeqCst);
+                    break 'outer;
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => (),
+            };
+
+            match check_process(&mut child) {
+                Ok(ProcessStatus::Running) => (),
+                Ok(ProcessStatus::Exited(code)) => {
+                    info!("Command exited with code {:?}", code);
+                    service_exit_code = if pass.contains(&code) {
+                        ServiceExitCode::NO_ERROR
+                    } else {
+                        ServiceExitCode::ServiceSpecific(code as u32)
+                    };
+                    if should_restart_exited_command(
+                        code,
+                        opts.restart,
+                        opts.no_restart,
+                        &opts.restart_if,
+                        &opts.restart_if_not,
+                    ) {
+                        break 'inner;
+                    } else {
+                        break 'outer;
+                    }
+                }
+                Ok(ProcessStatus::Terminated) => {
+                    info!("Command was terminated by a signal");
+                    service_exit_code =
+                        ServiceExitCode::Win32(winapi::shared::winerror::ERROR_PROCESS_ABORTED);
+                    if should_restart_terminated_command(opts.restart, opts.no_restart) {
+                        break 'inner;
+                    } else {
+                        break 'outer;
+                    }
+                }
+                Err(e) => {
+                    info!("Error trying to determine command status: {:?}", e);
+                    service_exit_code =
+                        ServiceExitCode::Win32(winapi::shared::winerror::ERROR_PROCESS_ABORTED);
+                    break 'inner;
+                }
+            }
+        }
+
+        if let Err(e) = stdout_logger.join() {
+            error!("Unable to join stdout logger thread: {:?}", e);
+        }
+        if let Err(e) = stderr_logger.join() {
+            error!("Unable to join stderr logger thread: {:?}", e);
+        }
+    }
+    debug!("Exited main service loop");
+
+    status_handle.set_service_status(ServiceStatus {
+        service_type: SERVICE_TYPE,
+        current_state: ServiceState::Stopped,
+        controls_accepted: ServiceControlAccept::empty(),
+        exit_code: service_exit_code,
+        checkpoint: 0,
+        wait_hint: std::time::Duration::default(),
+        process_id: None,
+    })?;
+
+    Ok(())
+}
+
+#[cfg(test)]
+speculate::speculate! {
+    describe "should_restart_exited_command" {
+        it "handles --restart" {
+            assert!(should_restart_exited_command(5, true, false, &[], &[]));
+        }
+
+        it "handles --no-restart" {
+            assert!(!should_restart_exited_command(0, false, true, &[], &[]));
+        }
+
+        it "handles --restart-if" {
+            assert!(should_restart_exited_command(0, false, false, &[0], &[]));
+            assert!(!should_restart_exited_command(1, false, false, &[0], &[]));
+        }
+
+        it "handles --restart-if-not" {
+            assert!(!should_restart_exited_command(0, false, false, &[], &[0]));
+            assert!(should_restart_exited_command(1, false, false, &[], &[0]));
+        }
+
+        it "restarts nonzero by default" {
+            assert!(!should_restart_exited_command(0, false, false, &[], &[]));
+            assert!(should_restart_exited_command(1, false, false, &[], &[]));
+        }
+    }
+
+    describe "should_restart_terminated_command" {
+        it "only restarts with --restart" {
+            assert!(!should_restart_terminated_command(false, false));
+            assert!(should_restart_terminated_command(true, false));
+            assert!(!should_restart_terminated_command(false, true));
+        }
+    }
+}
