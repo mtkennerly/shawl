@@ -87,7 +87,7 @@ speculate::speculate! {
 
         it "rejects nonexistent --cwd path" {
             let shawl_output = run_shawl(&["add", "--name", "shawl", "--cwd", "shawl-fake", "--", &child()]);
-            assert_eq!(shawl_output.status.code(), Some(1));
+            assert_eq!(shawl_output.status.code(), Some(2));
         }
     }
 

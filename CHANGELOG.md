@@ -1,3 +1,7 @@
+## Unreleased
+
+* The CLI output now uses a prettier format, including color.
+
 ## v1.1.1 (2022-09-16)
 
 * Fixed `--pass`, `--restart-if`, and `--restart-if-not` not allowing a leading negative number.

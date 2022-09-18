@@ -1,23 +1,23 @@
 use log::info;
 
-use structopt::StructOpt;
+use clap::Parser;
 
-#[derive(structopt::StructOpt, Debug)]
-#[structopt(
+#[derive(clap::Parser, Debug)]
+#[clap(
     name = "shawl-child",
     about = "Dummy program to test wrapping with Shawl"
 )]
 struct Cli {
     /// Run forever unless forcibly killed
-    #[structopt(long)]
+    #[clap(long)]
     infinite: bool,
 
     /// Exit immediately with this code
-    #[structopt(long)]
+    #[clap(long)]
     exit: Option<i32>,
 
     /// Test option, prints an extra line to stdout if received
-    #[structopt(long)]
+    #[clap(long)]
     test: bool,
 }
 

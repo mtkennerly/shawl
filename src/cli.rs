@@ -1,4 +1,4 @@
-use structopt::StructOpt;
+use clap::Parser;
 
 pub fn evaluate_cli() -> Cli {
     Cli::from_args()
@@ -8,23 +8,42 @@ fn parse_canonical_path(path: &str) -> Result<String, std::io::Error> {
     Ok(std::fs::canonicalize(path)?.to_string_lossy().to_string())
 }
 
-fn parse_ensured_directory(path: &str) -> Result<String, Box<dyn std::error::Error>> {
+fn parse_ensured_directory(path: &str) -> Result<String, std::io::Error> {
     std::fs::create_dir_all(&path)?;
     Ok(std::fs::canonicalize(path)?.to_string_lossy().to_string())
 }
 
-fn parse_env_var(value: &str) -> Result<(String, String), Box<dyn std::error::Error>> {
+#[derive(Debug)]
+pub enum CliError {
+    InvalidEnvVar { specification: String },
+}
+
+impl std::error::Error for CliError {}
+
+impl std::fmt::Display for CliError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidEnvVar { specification } => {
+                write!(f, "Invalid KEY=value formatting in '{}'", specification)
+            }
+        }
+    }
+}
+
+fn parse_env_var(value: &str) -> Result<(String, String), CliError> {
     let parts: Vec<&str> = value.splitn(2, '=').collect();
     if parts.len() != 2 {
-        return Err(format!("Invalid KEY=value formatting in '{}'", value).into());
+        return Err(CliError::InvalidEnvVar {
+            specification: value.to_string(),
+        });
     }
     Ok((parts[0].to_string(), parts[1].to_string()))
 }
 
-#[derive(structopt::StructOpt, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(clap::Parser, Clone, Debug, Default, PartialEq, Eq)]
 pub struct CommonOpts {
     /// Exit codes that should be considered successful (comma-separated) [default: 0]
-    #[structopt(
+    #[clap(
         long,
         value_name = "codes",
         use_delimiter(true),
@@ -34,7 +53,7 @@ pub struct CommonOpts {
     pub pass: Option<Vec<i32>>,
 
     /// Always restart the command regardless of the exit code
-    #[structopt(
+    #[clap(
         long,
         conflicts_with("no-restart"),
         conflicts_with("restart-if"),
@@ -43,7 +62,7 @@ pub struct CommonOpts {
     pub restart: bool,
 
     /// Never restart the command regardless of the exit code
-    #[structopt(
+    #[clap(
         long,
         conflicts_with("restart"),
         conflicts_with("restart-if"),
@@ -52,7 +71,7 @@ pub struct CommonOpts {
     pub no_restart: bool,
 
     /// Restart the command if the exit code is one of these (comma-separated)
-    #[structopt(
+    #[clap(
         long,
         conflicts_with("restart"),
         conflicts_with("no-restart"),
@@ -65,7 +84,7 @@ pub struct CommonOpts {
     pub restart_if: Vec<i32>,
 
     /// Restart the command if the exit code is not one of these (comma-separated)
-    #[structopt(
+    #[clap(
         long,
         conflicts_with("restart"),
         conflicts_with("no-restart"),
@@ -79,80 +98,80 @@ pub struct CommonOpts {
 
     /// How long to wait in milliseconds between sending the wrapped process
     /// a ctrl-C event and forcibly killing it [default: 3000]
-    #[structopt(long, value_name = "ms")]
+    #[clap(long, value_name = "ms")]
     pub stop_timeout: Option<u64>,
 
     /// Disable all of Shawl's logging
-    #[structopt(long)]
+    #[clap(long)]
     pub no_log: bool,
 
     /// Disable logging of output from the command running as a service
-    #[structopt(long)]
+    #[clap(long)]
     pub no_log_cmd: bool,
 
     /// Write log file to a custom directory. This directory will be created if it doesn't exist.
-    #[structopt(long, value_name = "path", parse(try_from_str = parse_ensured_directory))]
+    #[clap(long, value_name = "path", parse(try_from_str = parse_ensured_directory))]
     pub log_dir: Option<String>,
 
     /// Append the service start arguments to the command
-    #[structopt(long)]
+    #[clap(long)]
     pub pass_start_args: bool,
 
     /// Additional environment variable in the format 'KEY=value' (repeatable)
-    #[structopt(long, number_of_values = 1, parse(try_from_str = parse_env_var))]
+    #[clap(long, number_of_values = 1, parse(try_from_str = parse_env_var))]
     pub env: Vec<(String, String)>,
 
     /// Additional directory to add to the PATH environment variable (repeatable)
-    #[structopt(long, number_of_values = 1, parse(try_from_str = parse_canonical_path))]
+    #[clap(long, number_of_values = 1, parse(try_from_str = parse_canonical_path))]
     pub path: Vec<String>,
 
     /// Command to run as a service
-    #[structopt(required(true), last(true))]
+    #[clap(required(true), last(true))]
     pub command: Vec<String>,
 }
 
-#[derive(structopt::StructOpt, Clone, Debug, PartialEq, Eq)]
+#[derive(clap::Subcommand, Clone, Debug, PartialEq, Eq)]
 pub enum Subcommand {
-    #[structopt(about = "Add a new service")]
+    #[clap(about = "Add a new service")]
     Add {
-        #[structopt(flatten)]
+        #[clap(flatten)]
         common: CommonOpts,
 
         /// Working directory in which to run the command. You may provide a
         /// relative path, and it will be converted to an absolute one
-        #[structopt(long, value_name = "path", parse(try_from_str = parse_canonical_path))]
+        #[clap(long, value_name = "path", parse(try_from_str = parse_canonical_path))]
         cwd: Option<String>,
 
         /// Name of the service to create
-        #[structopt(long)]
+        #[clap(long)]
         name: String,
     },
-    #[structopt(
+    #[clap(
         about = "Run a command as a service; only works when launched by the Windows service manager"
     )]
     Run {
-        #[structopt(flatten)]
+        #[clap(flatten)]
         common: CommonOpts,
 
         /// Working directory in which to run the command. Must be an absolute path
-        #[structopt(long, value_name = "path")]
+        #[clap(long, value_name = "path")]
         cwd: Option<String>,
 
         /// Name of the service; used in logging, but does not need to match real name
-        #[structopt(long, default_value = "Shawl")]
+        #[clap(long, default_value = "Shawl")]
         name: String,
     },
 }
 
-#[derive(structopt::StructOpt, Clone, Debug, PartialEq, Eq)]
-#[structopt(
+#[derive(clap::Parser, Clone, Debug, PartialEq, Eq)]
+#[clap(
     name = "shawl",
     about = "Wrap arbitrary commands as Windows services",
     set_term_width = 80,
-    setting(structopt::clap::AppSettings::SubcommandsNegateReqs)
+    setting(clap::AppSettings::SubcommandsNegateReqs)
 )]
 pub struct Cli {
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     pub sub: Subcommand,
 }
 
@@ -165,7 +184,7 @@ speculate::speculate! {
         );
     }
 
-    fn check_args_err(args: &[&str], error: structopt::clap::ErrorKind) {
+    fn check_args_err(args: &[&str], error: clap::ErrorKind) {
         let result = Cli::clap().get_matches_from_safe(args);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().kind, error);
@@ -199,7 +218,7 @@ speculate::speculate! {
         it "requires a command" {
             check_args_err(
                 &["shawl", "run"],
-                structopt::clap::ErrorKind::MissingRequiredArgument,
+                clap::ErrorKind::MissingRequiredArgument,
             );
         }
 
@@ -240,7 +259,7 @@ speculate::speculate! {
         it "rejects --pass without value" {
             check_args_err(
                 &["shawl", "run", "--pass", "--", "foo"],
-                structopt::clap::ErrorKind::UnknownArgument,
+                clap::ErrorKind::UnknownArgument,
             );
         }
 
@@ -269,7 +288,7 @@ speculate::speculate! {
             ] {
                 check_args_err(
                     &case,
-                    structopt::clap::ErrorKind::ArgumentConflict,
+                    clap::ErrorKind::ArgumentConflict,
                 );
             }
         }
@@ -299,7 +318,7 @@ speculate::speculate! {
             ] {
                 check_args_err(
                     &case,
-                    structopt::clap::ErrorKind::ArgumentConflict,
+                    clap::ErrorKind::ArgumentConflict,
                 );
             }
         }
@@ -341,7 +360,7 @@ speculate::speculate! {
         it "rejects --restart-if without value" {
             check_args_err(
                 &["shawl", "run", "--restart-if", "--", "foo"],
-                structopt::clap::ErrorKind::UnknownArgument,
+                clap::ErrorKind::UnknownArgument,
             );
         }
 
@@ -353,7 +372,7 @@ speculate::speculate! {
             ] {
                 check_args_err(
                     &case,
-                    structopt::clap::ErrorKind::ArgumentConflict,
+                    clap::ErrorKind::ArgumentConflict,
                 );
             }
         }
@@ -395,7 +414,7 @@ speculate::speculate! {
         it "rejects --restart-if-not without value" {
             check_args_err(
                 &["shawl", "run", "--restart-if-not", "--", "foo"],
-                structopt::clap::ErrorKind::UnknownArgument,
+                clap::ErrorKind::UnknownArgument,
             );
         }
 
@@ -407,7 +426,7 @@ speculate::speculate! {
             ] {
                 check_args_err(
                     &case,
-                    structopt::clap::ErrorKind::ArgumentConflict,
+                    clap::ErrorKind::ArgumentConflict,
                 );
             }
         }
@@ -466,14 +485,14 @@ speculate::speculate! {
         it "requires a command" {
             check_args_err(
                 &["shawl", "add", "--name", "foo"],
-                structopt::clap::ErrorKind::MissingRequiredArgument,
+                clap::ErrorKind::MissingRequiredArgument,
             );
         }
 
         it "requires a name" {
             check_args_err(
                 &["shawl", "add", "--", "foo"],
-                structopt::clap::ErrorKind::MissingRequiredArgument,
+                clap::ErrorKind::MissingRequiredArgument,
             );
         }
 
