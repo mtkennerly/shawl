@@ -23,7 +23,8 @@ status to Windows:
 
 * By default, when your program exits, Shawl will restart it if the exit code
   is nonzero. You can customize this behavior with `--(no-)restart` for all
-  exit codes and `--restart-if(-not)` for specific exit codes.
+  exit codes or `--restart-if(-not)` for specific exit codes.
+  Note that these four options are mutually exclusive.
 * When the service is requested to stop, Shawl sends your program a ctrl-C
   event, then waits up to 3000 milliseconds (based on `--stop-timeout`) before
   forcibly killing the process if necessary.
