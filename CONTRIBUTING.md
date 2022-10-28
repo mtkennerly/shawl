@@ -3,10 +3,7 @@ Rust 1.38.0 or newer is recommended.
 
 * Run tests (avoid concurrency since the integration tests make real services):
   * `cargo test -- --test-threads 1`
-* Linting:
-  * `cargo fmt`
-  * `cargo clippy --tests -- -D warnings`
-* Activate pre-commit hooks (requires Python):
+* Activate pre-commit hooks (requires Python) to handle formatting/linting:
   ```
   pip install --user pre-commit
   pre-commit install
