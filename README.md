@@ -74,6 +74,9 @@ change the account used by the service instead.
   ```
 
 ## CLI
+Below in the top-level help output (from `shawl --help`).
+For help with specific subcommands, you can add the command name (e.g., `shawl add --help`).
+
 ```console
 $ shawl --help
 Wrap arbitrary commands as Windows services
