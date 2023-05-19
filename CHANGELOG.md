@@ -1,5 +1,8 @@
 ## Unreleased
 
+* Fixed: When both `--cwd` and `--path` were specified,
+  they would both try to update the command's `PATH` environment variable,
+  but the changes from `--cwd` would override the changes from `--path`.
 * The CLI output now uses a prettier format, including color.
 
 ## v1.1.1 (2022-09-16)

@@ -9,7 +9,7 @@ fn parse_canonical_path(path: &str) -> Result<String, std::io::Error> {
 }
 
 fn parse_ensured_directory(path: &str) -> Result<String, std::io::Error> {
-    std::fs::create_dir_all(&path)?;
+    std::fs::create_dir_all(path)?;
     Ok(std::fs::canonicalize(path)?.to_string_lossy().to_string())
 }
 

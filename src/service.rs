@@ -145,6 +145,7 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
         info!("Launching command");
         let should_log_cmd = !&opts.no_log_cmd;
         let mut child_cmd = std::process::Command::new(&program);
+        let mut path_env = std::env::var("PATH").ok();
 
         child_cmd
             .args(&args)
@@ -162,24 +163,22 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
             child_cmd.env(key, value);
         }
         if !opts.path.is_empty() {
-            child_cmd.env(
-                "PATH",
-                match std::env::var("PATH") {
-                    Ok(path) => format!("{};{}", path, &opts.path.join(";")),
-                    Err(_) => opts.path.join(";").to_string(),
-                },
-            );
+            path_env = match path_env {
+                Some(path) => Some(format!("{};{}", path, &opts.path.join(";"))),
+                None => Some(opts.path.join(";").to_string()),
+            };
         }
         if let Some(active_cwd) = &cwd {
             child_cmd.current_dir(active_cwd);
-            child_cmd.env(
-                "PATH",
-                match std::env::var("PATH") {
-                    Ok(path) => format!("{};{}", path, active_cwd),
-                    Err(_) => active_cwd.to_string(),
-                },
-            );
+            path_env = match path_env {
+                Some(path) => Some(format!("{};{}", path, active_cwd)),
+                None => Some(active_cwd.to_string()),
+            };
         }
+        if let Some(path_env) = path_env {
+            child_cmd.env("PATH", path_env);
+        }
+
         let mut child = match child_cmd.spawn() {
             Ok(c) => c,
             Err(e) => {
