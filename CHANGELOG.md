@@ -1,4 +1,4 @@
-## Unreleased
+## v1.2.0 (2023-05-19)
 
 * Fixed: When both `--cwd` and `--path` were specified,
   they would both try to update the command's `PATH` environment variable,
