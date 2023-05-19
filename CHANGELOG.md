@@ -3,7 +3,10 @@
 * Fixed: When both `--cwd` and `--path` were specified,
   they would both try to update the command's `PATH` environment variable,
   but the changes from `--cwd` would override the changes from `--path`.
-* The CLI output now uses a prettier format, including color.
+* Changed: When using `--cwd` and `--path`, Shawl now simplifies local UNC paths.
+  For example, `\\?\C:\tmp` becomes `C:\tmp`.
+  Some programs, notably Command Prompt, don't like UNC paths, so this is intended to broaden compatibility.
+* Changed: The CLI output now uses a prettier format, including color.
 
 ## v1.1.1 (2022-09-16)
 
