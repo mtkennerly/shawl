@@ -37,7 +37,7 @@ fn prepare_logging(
 
     // Set custom log directory
     if let Some(dir) = log_dir {
-        logger = logger.o_directory(Some(dir));
+        logger = logger.o_directory(Some(dir.replace("\\\\?\\", "")));
     }
 
     if console {
