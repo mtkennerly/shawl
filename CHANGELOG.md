@@ -1,3 +1,10 @@
+## v1.2.1 (2023-08-10)
+
+* Fixed: Possible case in which old log files would not be deleted.
+  (Contributed by [Luokun2016](https://github.com/mtkennerly/shawl/pull/33))
+* Added: Some guidance in the README related to security.
+  (Contributed by [kenvix](https://github.com/mtkennerly/shawl/pull/32))
+
 ## v1.2.0 (2023-05-19)
 
 * Fixed: When both `--cwd` and `--path` were specified,

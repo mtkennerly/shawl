@@ -55,16 +55,15 @@ change the account used by the service instead.
 
 Also note that running a service with a Local System account is as **dangerous**
 as running a Unix service as root. This greatly increases the risk of your system
-being hacked if you expose a port to the public for the service you are going to 
-wrap. It is recommended that you use a restricted account, such as [Network Service](
-https://learn.microsoft.com/en-us/windows/win32/services/networkservice-account),
-to run services. To do this, first grant the Network Service account read, write, 
-and execute permissions on Shawl’s installation directory, and then execute 
+being hacked if you expose a port to the public for the service you are going to
+wrap. It is recommended that you use a restricted account, such as
+[Network Service](https://learn.microsoft.com/en-us/windows/win32/services/networkservice-account),
+to run services. To do this, first grant the Network Service account read, write,
+and execute permissions on Shawl’s installation directory, and then execute
 `sc config my-app obj= "NT AUTHORITY\Network Service" password= ""`. If the service
-needs to read and write files, you may also need to grant the Network Service 
-permissions to the directory that the service wants to access. More information 
-about Windows service user accounts can be found [here](
-https://stackoverflow.com/questions/510170/the-difference-between-the-local-system-account-and-the-network-service-acco).
+needs to read and write files, you may also need to grant the Network Service
+permissions to the directory that the service wants to access. More information
+about Windows service user accounts can be found [here](https://stackoverflow.com/questions/510170).
 
 ## Installation
 * Prebuilt binaries are available on the
