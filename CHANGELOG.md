@@ -1,3 +1,7 @@
+## Unreleased
+
+* Fixed: The path to the Shawl executable was not quoted when it contained spaces.
+
 ## v1.2.1 (2023-08-10)
 
 * Fixed: Possible case in which old log files would not be deleted.

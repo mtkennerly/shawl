@@ -3,7 +3,11 @@ use log::error;
 use std::io::Write;
 
 pub fn add_service(name: String, cwd: Option<String>, opts: CommonOpts) -> Result<(), ()> {
-    let shawl_path = std::env::current_exe().expect("Unable to determine Shawl location");
+    let shawl_path = quote(
+        &std::env::current_exe()
+            .expect("Unable to determine Shawl location")
+            .to_string_lossy(),
+    );
     let shawl_args = construct_shawl_run_args(&name, &cwd, &opts);
     let prepared_command = prepare_command(&opts.command);
 
@@ -13,7 +17,7 @@ pub fn add_service(name: String, cwd: Option<String>, opts: CommonOpts) -> Resul
         .arg("binPath=")
         .arg(format!(
             "{} {} -- {}",
-            shawl_path.display(),
+            shawl_path,
             shawl_args.join(" "),
             prepared_command.join(" ")
         ))
