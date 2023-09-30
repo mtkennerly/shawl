@@ -1,8 +1,8 @@
 ## Development
-Rust 1.38.0 or newer is recommended.
+Use the latest version of Rust.
 
-* Run tests (avoid concurrency since the integration tests make real services):
-  * `cargo test -- --test-threads 1`
+* Run tests:
+  * `cargo test`
 * Activate pre-commit hooks (requires Python) to handle formatting/linting:
   ```
   pip install --user pre-commit
