@@ -23,8 +23,8 @@ enum ProcessStatus {
 
 /// Simplify local UNC paths since some programs (notably cmd.exe) don't like them.
 fn simplify_path(path: &str) -> String {
-    if path.starts_with(r#"\\?\C:"#) && path.get(5..6) == Some(":") {
-        path.replace(r#"\\?\"#, "")
+    if path.starts_with(r"\\?\C:") && path.get(5..6) == Some(":") {
+        path.replace(r"\\?\", "")
     } else {
         path.to_string()
     }
