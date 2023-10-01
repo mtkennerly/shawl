@@ -1,4 +1,4 @@
-## Unreleased
+## v1.3.0 (2023-10-01)
 
 * Fixed: The path to the Shawl executable was not quoted when it contained spaces.
 * Added: `--priority` option to set the process priority.
