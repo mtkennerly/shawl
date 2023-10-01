@@ -216,6 +216,10 @@ pub enum Subcommand {
         #[clap(long, value_name = "path", parse(try_from_str = parse_canonical_path))]
         cwd: Option<String>,
 
+        /// Other services that must be started first (comma-separated)
+        #[clap(long, use_delimiter(true))]
+        dependencies: Vec<String>,
+
         /// Name of the service to create
         #[clap(long)]
         name: String,
@@ -547,6 +551,7 @@ speculate::speculate! {
                     sub: Subcommand::Add {
                         name: s("custom-name"),
                         cwd: None,
+                        dependencies: vec![],
                         common: CommonOpts {
                             command: vec![s("foo")],
                             ..Default::default()
@@ -577,6 +582,7 @@ speculate::speculate! {
                     sub: Subcommand::Add {
                         name: s("foo"),
                         cwd: None,
+                        dependencies: vec![],
                         common: CommonOpts {
                             pass: Some(vec![1, 2]),
                             command: vec![s("foo")],
@@ -594,6 +600,7 @@ speculate::speculate! {
                     sub: Subcommand::Add {
                         name: s("foo"),
                         cwd: None,
+                        dependencies: vec![],
                         common: CommonOpts {
                             restart: true,
                             command: vec![s("foo")],
@@ -611,6 +618,7 @@ speculate::speculate! {
                     sub: Subcommand::Add {
                         name: s("foo"),
                         cwd: None,
+                        dependencies: vec![],
                         common: CommonOpts {
                             no_restart: true,
                             command: vec![s("foo")],
@@ -628,6 +636,7 @@ speculate::speculate! {
                     sub: Subcommand::Add {
                         name: s("foo"),
                         cwd: None,
+                        dependencies: vec![],
                         common: CommonOpts {
                             restart_if: vec![1, 2],
                             command: vec![s("foo")],
@@ -645,6 +654,7 @@ speculate::speculate! {
                     sub: Subcommand::Add {
                         name: s("foo"),
                         cwd: None,
+                        dependencies: vec![],
                         common: CommonOpts {
                             restart_if_not: vec![1, 2],
                             command: vec![s("foo")],
@@ -662,6 +672,7 @@ speculate::speculate! {
                     sub: Subcommand::Add {
                         name: s("foo"),
                         cwd: None,
+                        dependencies: vec![],
                         common: CommonOpts {
                             stop_timeout: Some(500),
                             command: vec![s("foo")],
@@ -748,6 +759,7 @@ speculate::speculate! {
                     sub: Subcommand::Add {
                         name: s("foo"),
                         cwd: None,
+                        dependencies: vec![],
                         common: CommonOpts {
                             env: vec![(s("FOO"), s("bar"))],
                             command: vec![s("foo")],
@@ -765,6 +777,7 @@ speculate::speculate! {
                     sub: Subcommand::Add {
                         name: s("foo"),
                         cwd: None,
+                        dependencies: vec![],
                         common: CommonOpts {
                             env: vec![(s("FOO"), s("1")), (s("BAR"), s("2"))],
                             command: vec![s("foo")],
@@ -783,6 +796,7 @@ speculate::speculate! {
                     sub: Subcommand::Add {
                         name: s("foo"),
                         cwd: None,
+                        dependencies: vec![],
                         common: CommonOpts {
                             path: vec![p(path)],
                             command: vec![s("foo")],
@@ -802,6 +816,7 @@ speculate::speculate! {
                     sub: Subcommand::Add {
                         name: s("foo"),
                         cwd: None,
+                        dependencies: vec![],
                         common: CommonOpts {
                             path: vec![p(&path1), p(&path2)],
                             command: vec![s("foo")],

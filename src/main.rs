@@ -76,8 +76,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Subcommand::Add {
             name,
             cwd,
+            dependencies,
             common: opts,
-        } => match control::add_service(name, cwd, opts) {
+        } => match control::add_service(name, cwd, &dependencies, opts) {
             Ok(_) => (),
             Err(_) => std::process::exit(1),
         },

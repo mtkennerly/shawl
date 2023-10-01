@@ -2,6 +2,7 @@
 
 * Fixed: The path to the Shawl executable was not quoted when it contained spaces.
 * Added: `--priority` option to set the process priority.
+* Added: `--dependencies` option for `add` command to specify services as dependencies.
 
 ## v1.2.1 (2023-08-10)
 
