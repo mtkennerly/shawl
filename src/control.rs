@@ -110,6 +110,10 @@ fn construct_shawl_run_args(name: &str, cwd: &Option<String>, opts: &CommonOpts)
             shawl_args.push(quote(path));
         }
     }
+    if let Some(priority) = opts.priority {
+        shawl_args.push("--priority".to_string());
+        shawl_args.push(priority.to_cli());
+    }
     shawl_args
 }
 
@@ -466,6 +470,20 @@ speculate::speculate! {
                     }
                 ),
                 vec!["run", "--name", "shawl", "--path", "C:/foo", "--path", "C:/bar"],
+            );
+        }
+
+        it "handles --priority" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &None,
+                    &CommonOpts {
+                        priority: Some(crate::cli::Priority::AboveNormal),
+                        ..Default::default()
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--priority", "above-normal"],
             );
         }
     }

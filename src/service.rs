@@ -1,6 +1,6 @@
 use crate::cli;
 use log::{debug, error, info};
-use std::io::BufRead;
+use std::{io::BufRead, os::windows::process::CommandExt};
 use windows_service::{
     define_windows_service,
     service::{
@@ -149,6 +149,11 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
         args.extend(start_arguments);
     }
 
+    let priority = match opts.priority {
+        Some(x) => x.to_winapi(),
+        None => winapi::um::winbase::INHERIT_CALLER_PRIORITY,
+    };
+
     debug!("Entering main service loop");
     'outer: loop {
         info!("Launching command");
@@ -158,6 +163,7 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
 
         child_cmd
             .args(&args)
+            .creation_flags(priority)
             .stdout(if should_log_cmd {
                 std::process::Stdio::piped()
             } else {

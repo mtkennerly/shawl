@@ -13,6 +13,13 @@ fn parse_ensured_directory(path: &str) -> Result<String, std::io::Error> {
     Ok(std::fs::canonicalize(path)?.to_string_lossy().to_string())
 }
 
+macro_rules! possible_values {
+    ($t: ty, $options: ident) => {{
+        use clap::builder::{PossibleValuesParser, TypedValueParser};
+        PossibleValuesParser::new(<$t>::$options).map(|s| s.parse::<$t>().unwrap())
+    }};
+}
+
 #[derive(Debug)]
 pub enum CliError {
     InvalidEnvVar { specification: String },
@@ -26,6 +33,69 @@ impl std::fmt::Display for CliError {
             Self::InvalidEnvVar { specification } => {
                 write!(f, "Invalid KEY=value formatting in '{}'", specification)
             }
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum Priority {
+    Realtime,
+    High,
+    AboveNormal,
+    #[default]
+    Normal,
+    BelowNormal,
+    Idle,
+}
+
+impl Priority {
+    pub const ALL: &'static [&'static str] = &[
+        "realtime",
+        "high",
+        "above-normal",
+        "normal",
+        "below-normal",
+        "idle",
+    ];
+}
+
+impl Priority {
+    pub fn to_cli(self) -> String {
+        match self {
+            Self::Realtime => "realtime",
+            Self::High => "high",
+            Self::AboveNormal => "above-normal",
+            Self::Normal => "normal",
+            Self::BelowNormal => "below-normal",
+            Self::Idle => "idle",
+        }
+        .to_string()
+    }
+
+    pub fn to_winapi(self) -> winapi::shared::minwindef::DWORD {
+        match self {
+            Self::Realtime => winapi::um::winbase::REALTIME_PRIORITY_CLASS,
+            Self::High => winapi::um::winbase::HIGH_PRIORITY_CLASS,
+            Self::AboveNormal => winapi::um::winbase::ABOVE_NORMAL_PRIORITY_CLASS,
+            Self::Normal => winapi::um::winbase::NORMAL_PRIORITY_CLASS,
+            Self::BelowNormal => winapi::um::winbase::BELOW_NORMAL_PRIORITY_CLASS,
+            Self::Idle => winapi::um::winbase::IDLE_PRIORITY_CLASS,
+        }
+    }
+}
+
+impl std::str::FromStr for Priority {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "realtime" => Ok(Self::Realtime),
+            "high" => Ok(Self::High),
+            "above-normal" => Ok(Self::AboveNormal),
+            "normal" => Ok(Self::Normal),
+            "below-normal" => Ok(Self::BelowNormal),
+            "idle" => Ok(Self::Idle),
+            _ => Err(format!("invalid priority: {}", s)),
         }
     }
 }
@@ -124,6 +194,10 @@ pub struct CommonOpts {
     /// Additional directory to add to the PATH environment variable (repeatable)
     #[clap(long, number_of_values = 1, parse(try_from_str = parse_canonical_path))]
     pub path: Vec<String>,
+
+    /// Process priority of the command to run as a service
+    #[clap(long, value_parser = possible_values!(Priority, ALL))]
+    pub priority: Option<Priority>,
 
     /// Command to run as a service
     #[clap(required(true), last(true))]
