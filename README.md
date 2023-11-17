@@ -11,7 +11,7 @@ options from the command that you'd like it to run):
 * Using Shawl's `add` command:
   * `shawl add --name my-app -- C:/path/my-app.exe`
 * Using the Windows `sc` command for more control:
-  * `sc create my-app binPath= "C:/path/shawl.exe run -- C:/path/my-app.exe"`
+  * `sc create my-app binPath= "C:/path/shawl.exe run --name my-app -- C:/path/my-app.exe"`
 * Then start or configure the service as normal:
   * ```
     sc config my-app start= auto
@@ -32,8 +32,8 @@ status to Windows:
   the exit code to Windows as a service-specific error, unless the exit code
   is 0 or a code you've configured with `--pass`.
 
-Shawl creates a log file for each service, `shawl_for_<service>_*.log`, in the
-same location as the Shawl executable, with both its own messages and the output
+Shawl creates a log file for each service, `shawl_for_<service>_*.log` (based on the `--name`),
+in the same location as the Shawl executable, with both its own messages and the output
 from the commands that it runs. If anything goes wrong, you can read the log to
 find out more. You can disable all logging with `--no-log`, and you can disable
 just the command logs with `--no-log-cmd`. Each log file is limited to 2 MB, and
