@@ -8,6 +8,11 @@ Use the latest version of Rust.
   pip install --user pre-commit
   pre-commit install
   ```
+* Generate docs (requires Python):
+  ```
+  pip install --user invoke
+  invoke docs
+  ```
 
 ## Release
 Commands assume you are using [Git Bash](https://git-scm.com) on Windows:

@@ -86,27 +86,7 @@ about Windows service user accounts can be found [here](https://stackoverflow.co
   ```
 
 ## CLI
-Below is the top-level help output (from `shawl --help`).
-For help with specific subcommands, you can add the command name (e.g., `shawl add --help`).
-
-```console
-$ shawl --help
-Wrap arbitrary commands as Windows services
-
-USAGE:
-    shawl.exe
-    shawl.exe <SUBCOMMAND>
-
-FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
-
-SUBCOMMANDS:
-    add     Add a new service
-    help    Prints this message or the help of the given subcommand(s)
-    run     Run a command as a service; only works when launched by the
-            Windows service manager
-```
+You can view the command line help text in [docs/cli.md](./docs/cli.md).
 
 ## Development
 Please refer to [CONTRIBUTING.md](CONTRIBUTING.md).
