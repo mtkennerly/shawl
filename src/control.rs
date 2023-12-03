@@ -106,6 +106,14 @@ fn construct_shawl_run_args(name: &str, cwd: &Option<String>, opts: &CommonOpts)
         shawl_args.push("--log-dir".to_string());
         shawl_args.push(quote(log_dir));
     }
+    if let Some(log_as) = &opts.log_as {
+        shawl_args.push("--log-as".to_string());
+        shawl_args.push(quote(log_as));
+    }
+    if let Some(log_cmd_as) = &opts.log_cmd_as {
+        shawl_args.push("--log-cmd-as".to_string());
+        shawl_args.push(quote(log_cmd_as));
+    }
     if let Some(log_rotate) = &opts.log_rotate {
         shawl_args.push("--log-rotate".to_string());
         shawl_args.push(log_rotate.to_cli());
@@ -363,6 +371,34 @@ speculate::speculate! {
                     }
                 ),
                 vec!["run", "--name", "shawl", "--no-log-cmd"],
+            );
+        }
+
+        it "handles --log-as" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &None,
+                    &CommonOpts {
+                        log_as: Some("foo".to_string()),
+                        ..Default::default()
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--log-as", "foo"],
+            );
+        }
+
+        it "handles --log-cmd-as" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &None,
+                    &CommonOpts {
+                        log_cmd_as: Some("foo".to_string()),
+                        ..Default::default()
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--log-cmd-as", "foo"],
             );
         }
 

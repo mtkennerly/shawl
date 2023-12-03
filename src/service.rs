@@ -209,6 +209,7 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
         };
 
         // Log stdout.
+        let output_logs_need_target = opts.log_cmd_as.is_some();
         let stdout_option = child.stdout.take();
         let stdout_logger = std::thread::spawn(move || {
             if !should_log_cmd {
@@ -218,7 +219,13 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
                 std::io::BufReader::new(stdout)
                     .lines()
                     .for_each(|line| match line {
-                        Ok(ref x) if !x.is_empty() => debug!("stdout: {:?}", x),
+                        Ok(ref x) if !x.is_empty() => {
+                            if output_logs_need_target {
+                                debug!(target: "{shawl-cmd}", "{}", x);
+                            } else {
+                                debug!("stdout: {:?}", x);
+                            }
+                        }
                         _ => (),
                     });
             }
@@ -234,7 +241,13 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
                 std::io::BufReader::new(stderr)
                     .lines()
                     .for_each(|line| match line {
-                        Ok(ref x) if !x.is_empty() => debug!("stderr: {:?}", x),
+                        Ok(ref x) if !x.is_empty() => {
+                            if output_logs_need_target {
+                                debug!(target: "{shawl-cmd}", "{}", x);
+                            } else {
+                                debug!("stderr: {:?}", x);
+                            }
+                        }
                         _ => (),
                     });
             }

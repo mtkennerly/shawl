@@ -228,6 +228,20 @@ pub struct CommonOpts {
     #[clap(long, value_name = "path", parse(try_from_str = parse_ensured_directory))]
     pub log_dir: Option<String>,
 
+    /// Use a different name for the main log file.
+    /// Set this to just the desired base name of the log file.
+    /// For example, `--log-as shawl` would result in a log file named `shawl_rCURRENT.log`
+    /// instead of the normal `shawl_for_<name>_rCURRENT.log` pattern.
+    #[clap(long)]
+    pub log_as: Option<String>,
+
+    /// Use a separate log file for the wrapped command's stdout and stderr.
+    /// Set this to just the desired base name of the log file.
+    /// For example, `--log-cmd-as foo` would result in a log file named `foo_rCURRENT.log`.
+    /// The output will be logged as-is without any additional log template.
+    #[clap(long)]
+    pub log_cmd_as: Option<String>,
+
     /// Threshold for rotating log files. Valid options:
     /// `daily`, `hourly`, `bytes=n` (every N bytes)
     /// [default: bytes=2097152]
@@ -764,6 +778,40 @@ speculate::speculate! {
                         cwd: None,
                         common: CommonOpts {
                             no_log_cmd: true,
+                            command: vec![s("foo")],
+                            ..Default::default()
+                        }
+                    }
+                },
+            );
+        }
+
+        it "accepts --log-as" {
+            check_args(
+                &["shawl", "run", "--log-as", "foo", "--", "foo"],
+                Cli {
+                    sub: Subcommand::Run {
+                        name: s("Shawl"),
+                        cwd: None,
+                        common: CommonOpts {
+                            log_as: Some("foo".to_string()),
+                            command: vec![s("foo")],
+                            ..Default::default()
+                        }
+                    }
+                },
+            );
+        }
+
+        it "accepts --log-cmd-as" {
+            check_args(
+                &["shawl", "run", "--log-cmd-as", "foo", "--", "foo"],
+                Cli {
+                    sub: Subcommand::Run {
+                        name: s("Shawl"),
+                        cwd: None,
+                        common: CommonOpts {
+                            log_cmd_as: Some("foo".to_string()),
                             command: vec![s("foo")],
                             ..Default::default()
                         }

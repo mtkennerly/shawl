@@ -2,6 +2,8 @@
 
 * Added: `--log-rotate` option to control how often the log file rotates.
 * Added: `--log-retain` option to control how many old log files are retained.
+* Added: `--log-as` option to change the base name of the main log file.
+* Added: `--log-cmd-as` option to log the wrapped command's stdout/stderr in a separate file.
 
 ## v1.3.0 (2023-10-01)
 
