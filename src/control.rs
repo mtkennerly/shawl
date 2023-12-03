@@ -106,6 +106,14 @@ fn construct_shawl_run_args(name: &str, cwd: &Option<String>, opts: &CommonOpts)
         shawl_args.push("--log-dir".to_string());
         shawl_args.push(quote(log_dir));
     }
+    if let Some(log_rotate) = &opts.log_rotate {
+        shawl_args.push("--log-rotate".to_string());
+        shawl_args.push(log_rotate.to_cli());
+    }
+    if let Some(log_retain) = &opts.log_retain {
+        shawl_args.push("--log-retain".to_string());
+        shawl_args.push(log_retain.to_string());
+    }
     if opts.pass_start_args {
         shawl_args.push("--pass-start-args".to_string());
     }
@@ -383,6 +391,34 @@ speculate::speculate! {
                     }
                 ),
                 vec!["run", "--name", "shawl", "--log-dir", "\"C:/foo bar/hello\""],
+            );
+        }
+
+        it "handles --log-rotate" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &None,
+                    &CommonOpts {
+                        log_rotate: Some(crate::cli::LogRotation::Daily),
+                        ..Default::default()
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--log-rotate", "daily"],
+            );
+        }
+
+        it "handles --log-retain" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &None,
+                    &CommonOpts {
+                        log_retain: Some(5),
+                        ..Default::default()
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--log-retain", "5"],
             );
         }
 

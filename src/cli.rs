@@ -100,6 +100,51 @@ impl std::str::FromStr for Priority {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LogRotation {
+    Bytes(u64),
+    Daily,
+    Hourly,
+}
+
+impl LogRotation {
+    pub fn to_cli(self) -> String {
+        match self {
+            LogRotation::Bytes(bytes) => format!("bytes={}", bytes),
+            LogRotation::Daily => "daily".to_string(),
+            LogRotation::Hourly => "hourly".to_string(),
+        }
+    }
+}
+
+impl std::str::FromStr for LogRotation {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "daily" => return Ok(Self::Daily),
+            "hourly" => return Ok(Self::Hourly),
+            _ => {}
+        }
+
+        if s.starts_with("bytes=") {
+            let parts: Vec<_> = s.splitn(2, '=').collect();
+            match parts[1].parse::<u64>() {
+                Ok(bytes) => return Ok(Self::Bytes(bytes)),
+                Err(e) => return Err(format!("Unable to parse log rotation as bytes: {:?}", e)),
+            }
+        }
+
+        Err(format!("Unable to parse log rotation: {}", s))
+    }
+}
+
+impl Default for LogRotation {
+    fn default() -> Self {
+        Self::Bytes(1024 * 1024 * 2)
+    }
+}
+
 fn parse_env_var(value: &str) -> Result<(String, String), CliError> {
     let parts: Vec<&str> = value.splitn(2, '=').collect();
     if parts.len() != 2 {
@@ -182,6 +227,16 @@ pub struct CommonOpts {
     /// Write log file to a custom directory. This directory will be created if it doesn't exist.
     #[clap(long, value_name = "path", parse(try_from_str = parse_ensured_directory))]
     pub log_dir: Option<String>,
+
+    /// Threshold for rotating log files. Valid options:
+    /// `daily`, `hourly`, `bytes=n` (every N bytes)
+    /// [default: bytes=2097152]
+    #[clap(long)]
+    pub log_rotate: Option<LogRotation>,
+
+    /// How many old log files to retain [default: 2]
+    #[clap(long)]
+    pub log_retain: Option<usize>,
 
     /// Append the service start arguments to the command
     #[clap(long)]
@@ -709,6 +764,74 @@ speculate::speculate! {
                         cwd: None,
                         common: CommonOpts {
                             no_log_cmd: true,
+                            command: vec![s("foo")],
+                            ..Default::default()
+                        }
+                    }
+                },
+            );
+        }
+
+        it "accepts --log-rotate bytes=n" {
+            check_args(
+                &["shawl", "run", "--log-rotate", "bytes=123", "--", "foo"],
+                Cli {
+                    sub: Subcommand::Run {
+                        name: s("Shawl"),
+                        cwd: None,
+                        common: CommonOpts {
+                            log_rotate: Some(LogRotation::Bytes(123)),
+                            command: vec![s("foo")],
+                            ..Default::default()
+                        }
+                    }
+                },
+            );
+        }
+
+        it "accepts --log-rotate daily" {
+            check_args(
+                &["shawl", "run", "--log-rotate", "daily", "--", "foo"],
+                Cli {
+                    sub: Subcommand::Run {
+                        name: s("Shawl"),
+                        cwd: None,
+                        common: CommonOpts {
+                            log_rotate: Some(LogRotation::Daily),
+                            command: vec![s("foo")],
+                            ..Default::default()
+                        }
+                    }
+                },
+            );
+        }
+
+        it "accepts --log-rotate hourly" {
+            check_args(
+                &["shawl", "run", "--log-rotate", "hourly", "--", "foo"],
+                Cli {
+                    sub: Subcommand::Run {
+                        name: s("Shawl"),
+                        cwd: None,
+                        common: CommonOpts {
+                            log_rotate: Some(LogRotation::Hourly),
+                            command: vec![s("foo")],
+                            ..Default::default()
+                        }
+                    }
+                },
+            );
+        }
+
+        it "accepts --log-retain" {
+            check_args(
+                &["shawl", "run", "--log-retain", "5", "--", "foo"],
+                Cli {
+                    sub: Subcommand::Run {
+                        name: s("Shawl"),
+                        cwd: None,
+                        common: CommonOpts {
+                            log_retain: Some(5),
                             command: vec![s("foo")],
                             ..Default::default()
                         }

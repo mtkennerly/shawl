@@ -8,8 +8,10 @@ use log::{debug, error};
 
 fn prepare_logging(
     name: &str,
-    log_dir: Option<String>,
+    log_dir: Option<&String>,
     console: bool,
+    rotation: cli::LogRotation,
+    retention: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut exe_dir = std::env::current_exe()?;
     exe_dir.pop();
@@ -20,9 +22,13 @@ fn prepare_logging(
         .discriminant(format!("for_{}", name))
         .append()
         .rotate(
-            flexi_logger::Criterion::Size(1024 * 1024 * 2),
+            match rotation {
+                cli::LogRotation::Bytes(bytes) => flexi_logger::Criterion::Size(bytes),
+                cli::LogRotation::Daily => flexi_logger::Criterion::Age(flexi_logger::Age::Day),
+                cli::LogRotation::Hourly => flexi_logger::Criterion::Age(flexi_logger::Age::Hour),
+            },
             flexi_logger::Naming::Timestamps,
-            flexi_logger::Cleanup::KeepLogFiles(2),
+            flexi_logger::Cleanup::KeepLogFiles(retention),
         )
         .format_for_files(|w, now, record| {
             write!(
@@ -58,15 +64,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Subcommand::Run { common: opts, .. } => !opts.no_log,
     };
     if should_log {
-        let name = match cli.clone().sub {
-            Subcommand::Add { name, .. } => name,
-            Subcommand::Run { name, .. } => name,
+        let (name, common) = match &cli.sub {
+            Subcommand::Add { name, common, .. } | Subcommand::Run { name, common, .. } => {
+                (name, common)
+            }
         };
-        let log_dir = match cli.clone().sub {
-            Subcommand::Add { common, .. } => common.log_dir,
-            Subcommand::Run { common, .. } => common.log_dir,
-        };
-        prepare_logging(&name, log_dir, console)?;
+        prepare_logging(
+            name,
+            common.log_dir.as_ref(),
+            console,
+            common.log_rotate.unwrap_or_default(),
+            common.log_retain.unwrap_or(2),
+        )?;
     }
 
     debug!("********** LAUNCH **********");
