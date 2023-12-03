@@ -25,10 +25,12 @@ fn prepare_logging() -> Result<(), Box<dyn std::error::Error>> {
     let mut exe_dir = std::env::current_exe()?;
     exe_dir.pop();
 
-    flexi_logger::Logger::with_env_or_str("debug")
-        .log_to_file()
-        .directory(exe_dir)
-        .suppress_timestamp()
+    flexi_logger::Logger::try_with_env_or_str("debug")?
+        .log_to_file(
+            flexi_logger::FileSpec::default()
+                .directory(exe_dir)
+                .suppress_timestamp(),
+        )
         .append()
         .duplicate_to_stderr(flexi_logger::Duplicate::Info)
         .format_for_files(|w, now, record| {

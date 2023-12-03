@@ -16,10 +16,18 @@ fn prepare_logging(
     let mut exe_dir = std::env::current_exe()?;
     exe_dir.pop();
 
-    let mut logger = flexi_logger::Logger::with_env_or_str("debug")
-        .log_to_file()
-        .directory(exe_dir)
-        .discriminant(format!("for_{}", name))
+    let mut logger = flexi_logger::Logger::try_with_env_or_str("debug")?
+        .log_to_file(
+            flexi_logger::FileSpec::default()
+                .directory(
+                    match log_dir {
+                        Some(log_dir) => log_dir.to_string(),
+                        None => exe_dir.to_string_lossy().to_string(),
+                    }
+                    .replace("\\\\?\\", ""),
+                )
+                .discriminant(format!("for_{}", name)),
+        )
         .append()
         .rotate(
             match rotation {
@@ -40,11 +48,6 @@ fn prepare_logging(
             )
         })
         .format_for_stderr(|w, _now, record| write!(w, "[{}] {}", record.level(), &record.args()));
-
-    // Set custom log directory
-    if let Some(dir) = log_dir {
-        logger = logger.o_directory(Some(dir.replace("\\\\?\\", "")));
-    }
 
     if console {
         logger = logger.duplicate_to_stderr(flexi_logger::Duplicate::Info);

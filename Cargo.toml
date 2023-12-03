@@ -11,14 +11,14 @@ default-run = "shawl"
 
 [dependencies]
 clap = { version = "3.2.22", features = ["derive"] }
-ctrlc = "3.2.3"
-flexi_logger = "0.15.1"
-log = "0.4.17"
+ctrlc = "3.4.1"
+flexi_logger = "0.27.3"
+log = "0.4.20"
 winapi = { version = "0.3.9", features = ["wincon"] }
-windows-service = "0.5.0"
+windows-service = "0.6.0"
 
 [dev-dependencies]
-regex = "1.6.0"
+regex = "1.10.2"
 speculate = "0.1.2"
 
 [build-dependencies]
