@@ -1,5 +1,7 @@
+import shutil
 from pathlib import Path
 
+import tomli
 from invoke import task
 
 
@@ -32,3 +34,20 @@ def docs(ctx):
     with cli.open("a") as f:
         for line in lines:
             f.write(line + "\n")
+
+
+@task
+def release(ctx):
+    dist = Path("dist")
+    if dist.exists():
+        shutil.rmtree(dist)
+    dist.mkdir()
+
+    # Make sure that the lock file has the new version
+    ctx.run("cargo build")
+
+    docs(ctx)
+
+    manifest = Path("Cargo.toml")
+    version = tomli.loads(manifest.read_bytes().decode("utf-8"))["package"]["version"]
+    ctx.run(f"cargo lichking bundle --file dist/shawl-v{version}-legal.txt")

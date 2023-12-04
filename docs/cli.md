@@ -45,9 +45,29 @@ OPTIONS:
     -h, --help
             Print help information
 
+        --log-as <LOG_AS>
+            Use a different name for the main log file. Set this to just the
+            desired base name of the log file. For example, `--log-as shawl`
+            would result in a log file named `shawl_rCURRENT.log` instead of the
+            normal `shawl_for_<name>_rCURRENT.log` pattern
+
+        --log-cmd-as <LOG_CMD_AS>
+            Use a separate log file for the wrapped command's stdout and stderr.
+            Set this to just the desired base name of the log file. For example,
+            `--log-cmd-as foo` would result in a log file named
+            `foo_rCURRENT.log`. The output will be logged as-is without any
+            additional log template
+
         --log-dir <path>
             Write log file to a custom directory. This directory will be created
             if it doesn't exist
+
+        --log-retain <LOG_RETAIN>
+            How many old log files to retain [default: 2]
+
+        --log-rotate <LOG_ROTATE>
+            Threshold for rotating log files. Valid options: `daily`, `hourly`,
+            `bytes=n` (every N bytes) [default: bytes=2097152]
 
         --name <NAME>
             Name of the service to create
@@ -116,9 +136,29 @@ OPTIONS:
     -h, --help
             Print help information
 
+        --log-as <LOG_AS>
+            Use a different name for the main log file. Set this to just the
+            desired base name of the log file. For example, `--log-as shawl`
+            would result in a log file named `shawl_rCURRENT.log` instead of the
+            normal `shawl_for_<name>_rCURRENT.log` pattern
+
+        --log-cmd-as <LOG_CMD_AS>
+            Use a separate log file for the wrapped command's stdout and stderr.
+            Set this to just the desired base name of the log file. For example,
+            `--log-cmd-as foo` would result in a log file named
+            `foo_rCURRENT.log`. The output will be logged as-is without any
+            additional log template
+
         --log-dir <path>
             Write log file to a custom directory. This directory will be created
             if it doesn't exist
+
+        --log-retain <LOG_RETAIN>
+            How many old log files to retain [default: 2]
+
+        --log-rotate <LOG_ROTATE>
+            Threshold for rotating log files. Valid options: `daily`, `hourly`,
+            `bytes=n` (every N bytes) [default: bytes=2097152]
 
         --name <NAME>
             Name of the service; used in logging, but does not need to match

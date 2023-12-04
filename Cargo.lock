@@ -422,7 +422,7 @@ checksum = "0f747710de3dcd43b88c9168773254e809d8ddbdf9653b84e2554ab219f17860"
 
 [[package]]
 name = "shawl"
-version = "1.3.0"
+version = "1.4.0"
 dependencies = [
  "clap",
  "ctrlc",

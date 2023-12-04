@@ -10,7 +10,7 @@ Use the latest version of Rust.
   ```
 * Generate docs (requires Python):
   ```
-  pip install --user invoke
+  pip install --user invoke tomli
   invoke docs
   ```
 
@@ -32,5 +32,4 @@ Commands assume you are using [Git Bash](https://git-scm.com) on Windows:
   cp target/i686-pc-windows-msvc/release/shawl.exe dist/shawl-v$VERSION-win32.exe
   cp target/x86_64-pc-windows-msvc/release/shawl.exe dist/shawl-v$VERSION-win64.exe
   cargo lichking bundle --file dist/shawl-v$VERSION-legal.txt
-  sed -i -E 's/\\\\\?\\C:\\Users\\[^\\]+/~/g' dist/shawl-v$VERSION-legal.txt
   ```

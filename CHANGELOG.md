@@ -1,4 +1,4 @@
-## Unreleased
+## v1.4.0 (2023-12-04)
 
 * Added: `--log-rotate` option to control how often the log file rotates.
 * Added: `--log-retain` option to control how many old log files are retained.
