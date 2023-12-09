@@ -76,6 +76,11 @@ If the service needs to read and write files,
 you may also need to grant the Network Service permissions to the directory that the service wants to access.
 More information about Windows service user accounts [can be found here](https://stackoverflow.com/questions/510170).
 
+### Recovery
+If you want to use the service recovery feature of Windows itself
+when Shawl gives up trying to restart the wrapped command,
+then make sure to turn on the "enable actions for stops with errors" option in the service properties.
+
 ## Comparison with other tools
 Shawl differs from existing solutions like
 [WinSW](https://github.com/kohsuke/winsw) and [NSSM](https://nssm.cc)
