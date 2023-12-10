@@ -1,7 +1,7 @@
 use clap::Parser;
 
 pub fn evaluate_cli() -> Cli {
-    Cli::from_args()
+    Cli::parse()
 }
 
 fn parse_canonical_path(path: &str) -> Result<String, std::io::Error> {
@@ -155,13 +155,23 @@ fn parse_env_var(value: &str) -> Result<(String, String), CliError> {
     Ok((parts[0].to_string(), parts[1].to_string()))
 }
 
+fn styles() -> clap::builder::styling::Styles {
+    use clap::builder::styling::{AnsiColor, Effects, Styles};
+
+    Styles::styled()
+        .header(AnsiColor::Yellow.on_default() | Effects::BOLD)
+        .usage(AnsiColor::Yellow.on_default() | Effects::BOLD)
+        .literal(AnsiColor::Green.on_default() | Effects::BOLD)
+        .placeholder(AnsiColor::Green.on_default())
+}
+
 #[derive(clap::Parser, Clone, Debug, Default, PartialEq, Eq)]
 pub struct CommonOpts {
     /// Exit codes that should be considered successful (comma-separated) [default: 0]
     #[clap(
         long,
         value_name = "codes",
-        use_delimiter(true),
+        value_delimiter = ',',
         number_of_values = 1,
         allow_hyphen_values(true)
     )]
@@ -170,9 +180,9 @@ pub struct CommonOpts {
     /// Always restart the command regardless of the exit code
     #[clap(
         long,
-        conflicts_with("no-restart"),
-        conflicts_with("restart-if"),
-        conflicts_with("restart-if-not")
+        conflicts_with("no_restart"),
+        conflicts_with("restart_if"),
+        conflicts_with("restart_if_not")
     )]
     pub restart: bool,
 
@@ -180,8 +190,8 @@ pub struct CommonOpts {
     #[clap(
         long,
         conflicts_with("restart"),
-        conflicts_with("restart-if"),
-        conflicts_with("restart-if-not")
+        conflicts_with("restart_if"),
+        conflicts_with("restart_if_not")
     )]
     pub no_restart: bool,
 
@@ -189,10 +199,10 @@ pub struct CommonOpts {
     #[clap(
         long,
         conflicts_with("restart"),
-        conflicts_with("no-restart"),
-        conflicts_with("restart-if-not"),
+        conflicts_with("no_restart"),
+        conflicts_with("restart_if_not"),
         value_name = "codes",
-        use_delimiter(true),
+        value_delimiter = ',',
         number_of_values = 1,
         allow_hyphen_values(true)
     )]
@@ -202,10 +212,10 @@ pub struct CommonOpts {
     #[clap(
         long,
         conflicts_with("restart"),
-        conflicts_with("no-restart"),
-        conflicts_with("restart-if"),
+        conflicts_with("no_restart"),
+        conflicts_with("restart_if"),
         value_name = "codes",
-        use_delimiter(true),
+        value_delimiter = ',',
         number_of_values = 1,
         allow_hyphen_values(true)
     )]
@@ -225,7 +235,7 @@ pub struct CommonOpts {
     pub no_log_cmd: bool,
 
     /// Write log file to a custom directory. This directory will be created if it doesn't exist.
-    #[clap(long, value_name = "path", parse(try_from_str = parse_ensured_directory))]
+    #[clap(long, value_name = "path", value_parser = parse_ensured_directory)]
     pub log_dir: Option<String>,
 
     /// Use a different name for the main log file.
@@ -257,11 +267,11 @@ pub struct CommonOpts {
     pub pass_start_args: bool,
 
     /// Additional environment variable in the format 'KEY=value' (repeatable)
-    #[clap(long, number_of_values = 1, parse(try_from_str = parse_env_var))]
+    #[clap(long, number_of_values = 1, value_parser = parse_env_var)]
     pub env: Vec<(String, String)>,
 
     /// Additional directory to add to the PATH environment variable (repeatable)
-    #[clap(long, number_of_values = 1, parse(try_from_str = parse_canonical_path))]
+    #[clap(long, number_of_values = 1, value_parser = parse_canonical_path)]
     pub path: Vec<String>,
 
     /// Process priority of the command to run as a service
@@ -282,11 +292,11 @@ pub enum Subcommand {
 
         /// Working directory in which to run the command. You may provide a
         /// relative path, and it will be converted to an absolute one
-        #[clap(long, value_name = "path", parse(try_from_str = parse_canonical_path))]
+        #[clap(long, value_name = "path", value_parser = parse_canonical_path)]
         cwd: Option<String>,
 
         /// Other services that must be started first (comma-separated)
-        #[clap(long, use_delimiter(true))]
+        #[clap(long, value_delimiter = ',')]
         dependencies: Vec<String>,
 
         /// Name of the service to create
@@ -313,9 +323,12 @@ pub enum Subcommand {
 #[derive(clap::Parser, Clone, Debug, PartialEq, Eq)]
 #[clap(
     name = "shawl",
+    version,
     about = "Wrap arbitrary commands as Windows services",
-    set_term_width = 80,
-    setting(clap::AppSettings::SubcommandsNegateReqs)
+    max_term_width = 100,
+    subcommand_negates_reqs = true,
+    next_line_help = true,
+    styles = styles()
 )]
 pub struct Cli {
     #[clap(subcommand)]
@@ -327,14 +340,14 @@ speculate::speculate! {
     fn check_args(args: &[&str], expected: Cli) {
         assert_eq!(
             expected,
-            Cli::from_clap(&Cli::clap().get_matches_from(args))
+            Cli::parse_from(args)
         );
     }
 
-    fn check_args_err(args: &[&str], error: clap::ErrorKind) {
-        let result = Cli::clap().get_matches_from_safe(args);
+    fn check_args_err(args: &[&str], error: clap::error::ErrorKind) {
+        let result = Cli::try_parse_from(args);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err().kind, error);
+        assert_eq!(result.unwrap_err().kind(), error);
     }
 
     fn s(text: &str) -> String {
@@ -365,7 +378,7 @@ speculate::speculate! {
         it "requires a command" {
             check_args_err(
                 &["shawl", "run"],
-                clap::ErrorKind::MissingRequiredArgument,
+                clap::error::ErrorKind::MissingRequiredArgument,
             );
         }
 
@@ -406,7 +419,7 @@ speculate::speculate! {
         it "rejects --pass without value" {
             check_args_err(
                 &["shawl", "run", "--pass", "--", "foo"],
-                clap::ErrorKind::UnknownArgument,
+                clap::error::ErrorKind::UnknownArgument,
             );
         }
 
@@ -435,7 +448,7 @@ speculate::speculate! {
             ] {
                 check_args_err(
                     &case,
-                    clap::ErrorKind::ArgumentConflict,
+                    clap::error::ErrorKind::ArgumentConflict,
                 );
             }
         }
@@ -465,7 +478,7 @@ speculate::speculate! {
             ] {
                 check_args_err(
                     &case,
-                    clap::ErrorKind::ArgumentConflict,
+                    clap::error::ErrorKind::ArgumentConflict,
                 );
             }
         }
@@ -507,7 +520,7 @@ speculate::speculate! {
         it "rejects --restart-if without value" {
             check_args_err(
                 &["shawl", "run", "--restart-if", "--", "foo"],
-                clap::ErrorKind::UnknownArgument,
+                clap::error::ErrorKind::UnknownArgument,
             );
         }
 
@@ -519,7 +532,7 @@ speculate::speculate! {
             ] {
                 check_args_err(
                     &case,
-                    clap::ErrorKind::ArgumentConflict,
+                    clap::error::ErrorKind::ArgumentConflict,
                 );
             }
         }
@@ -561,7 +574,7 @@ speculate::speculate! {
         it "rejects --restart-if-not without value" {
             check_args_err(
                 &["shawl", "run", "--restart-if-not", "--", "foo"],
-                clap::ErrorKind::UnknownArgument,
+                clap::error::ErrorKind::UnknownArgument,
             );
         }
 
@@ -573,7 +586,7 @@ speculate::speculate! {
             ] {
                 check_args_err(
                     &case,
-                    clap::ErrorKind::ArgumentConflict,
+                    clap::error::ErrorKind::ArgumentConflict,
                 );
             }
         }
@@ -633,14 +646,14 @@ speculate::speculate! {
         it "requires a command" {
             check_args_err(
                 &["shawl", "add", "--name", "foo"],
-                clap::ErrorKind::MissingRequiredArgument,
+                clap::error::ErrorKind::MissingRequiredArgument,
             );
         }
 
         it "requires a name" {
             check_args_err(
                 &["shawl", "add", "--", "foo"],
-                clap::ErrorKind::MissingRequiredArgument,
+                clap::error::ErrorKind::MissingRequiredArgument,
             );
         }
 

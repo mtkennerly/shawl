@@ -1,3 +1,8 @@
+## Unreleased
+
+* Added: `shawl --version` to display the program version.
+* Changed: Help text is now styled a bit differently.
+
 ## v1.4.0 (2023-12-04)
 
 * Added: `--log-rotate` option to control how often the log file rotates.

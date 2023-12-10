@@ -51,7 +51,7 @@ fn prepare_logging() -> Result<(), Box<dyn std::error::Error>> {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     prepare_logging()?;
     info!("********** LAUNCH **********");
-    let cli = Cli::from_args();
+    let cli = Cli::parse();
     info!("{:?}", cli);
     info!("PATH: {}", std::env::var("PATH").unwrap());
     info!("env.SHAWL_FROM_CLI: {:?}", std::env::var("SHAWL_FROM_CLI"));
