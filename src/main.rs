@@ -6,6 +6,13 @@ mod service;
 use crate::cli::{evaluate_cli, Subcommand};
 use log::{debug, error};
 
+/// Simplify local UNC paths since some programs (notably cmd.exe) don't like them.
+pub fn simplify_path(path: &str) -> String {
+    dunce::simplified(std::path::Path::new(path))
+        .to_string_lossy()
+        .to_string()
+}
+
 fn prepare_logging(
     name: &str,
     log_dir: Option<&String>,
@@ -18,11 +25,10 @@ fn prepare_logging(
     let mut exe_dir = std::env::current_exe()?;
     exe_dir.pop();
 
-    let log_dir = match log_dir {
+    let log_dir = simplify_path(&match log_dir {
         Some(log_dir) => log_dir.to_string(),
         None => exe_dir.to_string_lossy().to_string(),
-    }
-    .replace("\\\\?\\", "");
+    });
 
     let rotation = match rotation {
         cli::LogRotation::Bytes(bytes) => flexi_logger::Criterion::Size(bytes),

@@ -1,5 +1,6 @@
 ## Unreleased
 
+* Fixed: Local UNC paths were only simplified for the C drive.
 * Added: `shawl --version` to display the program version.
 * Changed: Help text is now styled a bit differently.
 

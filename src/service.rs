@@ -21,15 +21,6 @@ enum ProcessStatus {
     Terminated,
 }
 
-/// Simplify local UNC paths since some programs (notably cmd.exe) don't like them.
-fn simplify_path(path: &str) -> String {
-    if path.starts_with(r"\\?\C:") && path.get(5..6) == Some(":") {
-        path.replace(r"\\?\", "")
-    } else {
-        path.to_string()
-    }
-}
-
 fn check_process(
     child: &mut std::process::Child,
 ) -> Result<ProcessStatus, Box<dyn std::error::Error>> {
@@ -178,14 +169,14 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
             child_cmd.env(key, value);
         }
         if !opts.path.is_empty() {
-            let simplified: Vec<_> = opts.path.iter().map(|x| simplify_path(x)).collect();
+            let simplified: Vec<_> = opts.path.iter().map(|x| crate::simplify_path(x)).collect();
             path_env = match path_env {
                 Some(path) => Some(format!("{};{}", path, simplified.join(";"))),
                 None => Some(simplified.join(";").to_string()),
             };
         }
         if let Some(active_cwd) = &cwd {
-            let active_cwd = simplify_path(active_cwd);
+            let active_cwd = crate::simplify_path(active_cwd);
             child_cmd.current_dir(&active_cwd);
             path_env = match path_env {
                 Some(path) => Some(format!("{};{}", path, active_cwd)),
@@ -416,24 +407,6 @@ speculate::speculate! {
             assert!(!should_restart_terminated_command(false, false));
             assert!(should_restart_terminated_command(true, false));
             assert!(!should_restart_terminated_command(false, true));
-        }
-    }
-
-    describe "simplify_path" {
-        it "simplifies local UNC paths" {
-            assert_eq!(r#"C:\tmp"#, simplify_path(r#"\\?\C:\tmp"#));
-        }
-
-        it "does not simplify remote UNC paths" {
-            assert_eq!(r#"\\?\remote\tmp"#, simplify_path(r#"\\?\remote\tmp"#));
-        }
-
-        it "does not simplify simple paths" {
-            assert_eq!(r#"C:\tmp"#, simplify_path(r#"C:\tmp"#));
-        }
-
-        it "does not simplify other paths" {
-            assert_eq!("/dev/null", simplify_path("/dev/null"));
         }
     }
 }
