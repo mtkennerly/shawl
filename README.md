@@ -12,10 +12,13 @@ and pass the command to run via CLI.
   [releases page](https://github.com/mtkennerly/shawl/releases).
   It's portable, so you can simply download it and put it anywhere
   without going through an installer.
-* If you have Rust installed, you can run `cargo install shawl`.
+* If you have Rust installed, you can run `cargo install --locked shawl`.
 * If you have [Scoop](https://scoop.sh):
   * To install: `scoop bucket add extras && scoop install shawl`
   * To update: `scoop update && scoop update shawl`
+* If you have [Winget](https://github.com/microsoft/winget-cli).
+  * To install: `winget install -e --id mtkennerly.shawl`
+  * To update: `winget upgrade -e --id mtkennerly.shawl`
 
 ## Usage
 Here is an example of creating a service wrapped with Shawl
