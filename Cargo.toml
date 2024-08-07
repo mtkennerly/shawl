@@ -16,6 +16,7 @@ dunce = "1.0.4"
 flexi_logger = "0.27.3"
 log = "0.4.20"
 winapi = { version = "0.3.9", features = ["consoleapi", "errhandlingapi", "winbase", "wincon"] }
+windows = { version = "0.57.0", features = ["Win32_Media_Audio", "Win32_Media_Audio_Endpoints", "Win32_Media_Multimedia", "Win32_System_Com"] }
 windows-service = "0.6.0"
 
 [dev-dependencies]

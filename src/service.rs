@@ -11,7 +11,9 @@ use windows_service::{
     service_dispatcher,
 };
 
-const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
+fn get_service_type() -> ServiceType {
+    ServiceType::OWN_PROCESS | ServiceType::INTERACTIVE_PROCESS
+}
 
 define_windows_service!(ffi_service_main, service_main);
 
@@ -124,7 +126,7 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
     let status_handle = service_control_handler::register(name, event_handler)?;
 
     status_handle.set_service_status(ServiceStatus {
-        service_type: SERVICE_TYPE,
+        service_type: get_service_type(),
         current_state: ServiceState::Running,
         controls_accepted: ServiceControlAccept::STOP | ServiceControlAccept::SHUTDOWN,
         exit_code: ServiceExitCode::NO_ERROR,
@@ -248,7 +250,7 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
             match shutdown_rx.recv_timeout(std::time::Duration::from_secs(1)) {
                 Ok(_) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
                     status_handle.set_service_status(ServiceStatus {
-                        service_type: SERVICE_TYPE,
+                        service_type: get_service_type(),
                         current_state: ServiceState::StopPending,
                         controls_accepted: ServiceControlAccept::empty(),
                         exit_code: ServiceExitCode::NO_ERROR,
@@ -363,7 +365,7 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
     debug!("Exited main service loop");
 
     status_handle.set_service_status(ServiceStatus {
-        service_type: SERVICE_TYPE,
+        service_type: get_service_type(),
         current_state: ServiceState::Stopped,
         controls_accepted: ServiceControlAccept::empty(),
         exit_code: service_exit_code,

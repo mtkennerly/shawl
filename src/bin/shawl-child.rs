@@ -1,4 +1,7 @@
+use std::collections::HashMap;
+
 use log::info;
+use windows::core::s;
 
 use clap::Parser;
 
@@ -48,6 +51,81 @@ fn prepare_logging() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[allow(unused)]
+type DeviceAudio = HashMap<String, Audio>;
+
+#[allow(unused)]
+#[derive(Debug)]
+struct Audio {
+    volume: f32,
+    peak: f32,
+}
+
+#[allow(unused)]
+fn get_audio() -> windows::core::Result<DeviceAudio> {
+    use windows::Win32::{
+        Media::Audio::{
+            eCapture, eCommunications, eConsole, eMultimedia, eRender,
+            Endpoints::{IAudioEndpointVolume, IAudioMeterInformation},
+            IMMDeviceEnumerator, MMDeviceEnumerator,
+        },
+        System::Com::{
+            CoCreateInstance, CoInitializeEx, CLSCTX_ALL, CLSCTX_INPROC_SERVER,
+            COINIT_APARTMENTTHREADED,
+        },
+    };
+
+    unsafe {
+        CoInitializeEx(None, COINIT_APARTMENTTHREADED).ok()?;
+        let device_enumerator: IMMDeviceEnumerator =
+            CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_INPROC_SERVER)?;
+
+        let mut out = HashMap::<String, Audio>::new();
+
+        for (label, dataflow, role) in [
+            ("output-console", eRender, eConsole),
+            ("output-multimedia", eRender, eMultimedia),
+            ("output-communications", eRender, eCommunications),
+            ("input-console", eCapture, eConsole),
+            ("input-multimedia", eCapture, eMultimedia),
+            ("input-communications", eCapture, eCommunications),
+        ] {
+            let device = device_enumerator.GetDefaultAudioEndpoint(dataflow, role)?;
+
+            let endpoint_volume: IAudioEndpointVolume = device.Activate(CLSCTX_ALL, None)?;
+            let volume = endpoint_volume.GetMasterVolumeLevel()?;
+
+            let meter: IAudioMeterInformation = device.Activate(CLSCTX_ALL, None)?;
+            let peak = meter.GetPeakValue()?;
+
+            out.insert(label.to_string(), Audio { volume, peak });
+        }
+
+        Ok(out)
+    }
+}
+
+unsafe fn mci_send_string(label: &str, input: windows::core::PCSTR) -> Result<(), String> {
+    use windows::Win32::Media::Multimedia::mciSendStringA;
+
+    let mut buffer = [0; 12];
+
+    let code = mciSendStringA(
+        input,
+        Some(&mut buffer),
+        windows::Win32::Foundation::HWND::default(),
+    );
+
+    let message = String::from_utf8(buffer.to_vec());
+
+    log::info!("[mci-{label}] code: {code}, message: {message:?}");
+    if code == 0 {
+        Ok(())
+    } else {
+        Err(format!("[mci-{label}] code: {code}"))
+    }
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     prepare_logging()?;
     info!("********** LAUNCH **********");
@@ -78,9 +156,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     })?;
 
+    unsafe {
+        mci_send_string("open", s!("open new type waveaudio alias arbitrary"))?;
+        mci_send_string("set", s!("set arbitrary bitspersample 16 channels 1 alignment 2 samplespersec 22050 format tag pcm wait"))?;
+    }
+
     while running.load(std::sync::atomic::Ordering::SeqCst) {
-        std::thread::sleep(std::time::Duration::from_millis(500));
-        info!("Looping!");
+        std::thread::sleep(std::time::Duration::from_millis(250));
+        unsafe {
+            mci_send_string("status", s!("status arbitrary level"))?;
+        }
+    }
+
+    unsafe {
+        mci_send_string("close", s!("close arbitrary"))?;
     }
 
     info!("End");
