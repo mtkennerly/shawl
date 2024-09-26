@@ -32,7 +32,7 @@ jobs:
         with:
           toolchain: stable-${{ matrix.rust-target }}
       - run: cargo build --release
-      - uses: actions/upload-artifact@v1
+      - uses: actions/upload-artifact@v4
         with:
           name: shawl-v${{ env.DUNAMAI_VERSION }}-${{ matrix.artifact-name }}
           path: target/release/shawl.exe
