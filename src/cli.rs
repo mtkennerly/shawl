@@ -72,14 +72,14 @@ impl Priority {
         .to_string()
     }
 
-    pub fn to_winapi(self) -> winapi::shared::minwindef::DWORD {
+    pub fn to_windows(self) -> windows::Win32::System::Threading::PROCESS_CREATION_FLAGS {
         match self {
-            Self::Realtime => winapi::um::winbase::REALTIME_PRIORITY_CLASS,
-            Self::High => winapi::um::winbase::HIGH_PRIORITY_CLASS,
-            Self::AboveNormal => winapi::um::winbase::ABOVE_NORMAL_PRIORITY_CLASS,
-            Self::Normal => winapi::um::winbase::NORMAL_PRIORITY_CLASS,
-            Self::BelowNormal => winapi::um::winbase::BELOW_NORMAL_PRIORITY_CLASS,
-            Self::Idle => winapi::um::winbase::IDLE_PRIORITY_CLASS,
+            Self::Realtime => windows::Win32::System::Threading::REALTIME_PRIORITY_CLASS,
+            Self::High => windows::Win32::System::Threading::HIGH_PRIORITY_CLASS,
+            Self::AboveNormal => windows::Win32::System::Threading::ABOVE_NORMAL_PRIORITY_CLASS,
+            Self::Normal => windows::Win32::System::Threading::NORMAL_PRIORITY_CLASS,
+            Self::BelowNormal => windows::Win32::System::Threading::BELOW_NORMAL_PRIORITY_CLASS,
+            Self::Idle => windows::Win32::System::Threading::IDLE_PRIORITY_CLASS,
         }
     }
 }

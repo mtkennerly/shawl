@@ -62,10 +62,10 @@ fn service_main(mut arguments: Vec<std::ffi::OsString>) {
     unsafe {
         // Windows services don't start with a console, so we have to
         // allocate one in order to send ctrl-C to children.
-        if winapi::um::consoleapi::AllocConsole() == 0 {
+        if windows::Win32::System::Console::AllocConsole().is_err() {
             error!(
-                "winapi AllocConsole failed with code {:?}",
-                winapi::um::errhandlingapi::GetLastError()
+                "Windows AllocConsole failed with code {:?}",
+                windows::Win32::Foundation::GetLastError()
             );
         };
     }
@@ -141,8 +141,8 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
     }
 
     let priority = match opts.priority {
-        Some(x) => x.to_winapi(),
-        None => winapi::um::winbase::INHERIT_CALLER_PRIORITY,
+        Some(x) => x.to_windows().0,
+        None => windows::Win32::System::Threading::INHERIT_CALLER_PRIORITY.0,
     };
 
     debug!("Entering main service loop");
@@ -193,7 +193,9 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
                 error!("Unable to launch command: {}", e);
                 service_exit_code = match e.raw_os_error() {
                     Some(win_code) => ServiceExitCode::Win32(win_code as u32),
-                    None => ServiceExitCode::Win32(winapi::shared::winerror::ERROR_PROCESS_ABORTED),
+                    None => {
+                        ServiceExitCode::Win32(windows::Win32::Foundation::ERROR_PROCESS_ABORTED.0)
+                    }
                 };
                 break;
             }
@@ -262,14 +264,15 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
                     ignore_ctrlc.store(true, std::sync::atomic::Ordering::SeqCst);
                     info!("Sending ctrl-C to command");
                     unsafe {
-                        if winapi::um::wincon::GenerateConsoleCtrlEvent(
-                            winapi::um::wincon::CTRL_C_EVENT,
+                        if windows::Win32::System::Console::GenerateConsoleCtrlEvent(
+                            windows::Win32::System::Console::CTRL_C_EVENT,
                             0,
-                        ) == 0
+                        )
+                        .is_err()
                         {
                             error!(
-                                "winapi GenerateConsoleCtrlEvent failed with code {:?}",
-                                winapi::um::errhandlingapi::GetLastError()
+                                "Windows GenerateConsoleCtrlEvent failed with code {:?}",
+                                windows::Win32::Foundation::GetLastError()
                             );
                         };
                     }
@@ -337,7 +340,7 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
                 Ok(ProcessStatus::Terminated) => {
                     info!("Command was terminated by a signal");
                     service_exit_code =
-                        ServiceExitCode::Win32(winapi::shared::winerror::ERROR_PROCESS_ABORTED);
+                        ServiceExitCode::Win32(windows::Win32::Foundation::ERROR_PROCESS_ABORTED.0);
                     if should_restart_terminated_command(opts.restart, opts.no_restart) {
                         break 'inner;
                     } else {
@@ -347,7 +350,7 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
                 Err(e) => {
                     info!("Error trying to determine command status: {:?}", e);
                     service_exit_code =
-                        ServiceExitCode::Win32(winapi::shared::winerror::ERROR_PROCESS_ABORTED);
+                        ServiceExitCode::Win32(windows::Win32::Foundation::ERROR_PROCESS_ABORTED.0);
                     break 'inner;
                 }
             }
