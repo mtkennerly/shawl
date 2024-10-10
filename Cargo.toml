@@ -24,3 +24,7 @@ speculate = "0.1.2"
 
 [build-dependencies]
 winres = "0.1.12"
+
+[profile.release]
+lto = "thin"
+strip = true
