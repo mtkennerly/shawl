@@ -1,3 +1,7 @@
+## Unreleased
+
+* Fixed: Old log files were not deleted when stored on a Windows network share.
+
 ## v1.5.0 (2024-03-02)
 
 * Fixed: Local UNC paths were only simplified for the C drive.

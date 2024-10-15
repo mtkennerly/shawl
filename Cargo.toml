@@ -10,16 +10,16 @@ license = "MIT"
 default-run = "shawl"
 
 [dependencies]
-clap = { version = "4.4.11", features = ["derive", "wrap_help"] }
-ctrlc = "3.4.1"
-dunce = "1.0.4"
-flexi_logger = "0.27.3"
-log = "0.4.20"
+clap = { version = "4.5.20", features = ["derive", "wrap_help"] }
+ctrlc = "3.4.5"
+dunce = "1.0.5"
+flexi_logger = "0.29.3"
+log = "0.4.22"
 windows = { version = "0.58.0", features = ["Win32_System_Console", "Win32_System_Threading"] }
-windows-service = "0.6.0"
+windows-service = "0.7.0"
 
 [dev-dependencies]
-regex = "1.10.2"
+regex = "1.11.0"
 speculate = "0.1.2"
 
 [build-dependencies]
