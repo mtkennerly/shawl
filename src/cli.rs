@@ -49,14 +49,7 @@ pub enum Priority {
 }
 
 impl Priority {
-    pub const ALL: &'static [&'static str] = &[
-        "realtime",
-        "high",
-        "above-normal",
-        "normal",
-        "below-normal",
-        "idle",
-    ];
+    pub const ALL: &'static [&'static str] = &["realtime", "high", "above-normal", "normal", "below-normal", "idle"];
 }
 
 impl Priority {
@@ -303,9 +296,7 @@ pub enum Subcommand {
         #[clap(long)]
         name: String,
     },
-    #[clap(
-        about = "Run a command as a service; only works when launched by the Windows service manager"
-    )]
+    #[clap(about = "Run a command as a service; only works when launched by the Windows service manager")]
     Run {
         #[clap(flatten)]
         common: CommonOpts,

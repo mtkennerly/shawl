@@ -103,9 +103,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     if should_log {
         let (name, common) = match &cli.sub {
-            Subcommand::Add { name, common, .. } | Subcommand::Run { name, common, .. } => {
-                (name, common)
-            }
+            Subcommand::Add { name, common, .. } | Subcommand::Run { name, common, .. } => (name, common),
         };
         prepare_logging(
             name,

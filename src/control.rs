@@ -2,12 +2,7 @@ use crate::cli::CommonOpts;
 use log::error;
 use std::io::Write;
 
-pub fn add_service(
-    name: String,
-    cwd: Option<String>,
-    dependencies: &[String],
-    opts: CommonOpts,
-) -> Result<(), ()> {
+pub fn add_service(name: String, cwd: Option<String>, dependencies: &[String], opts: CommonOpts) -> Result<(), ()> {
     let shawl_path = quote(
         &std::env::current_exe()
             .expect("Unable to determine Shawl location")
@@ -85,12 +80,7 @@ fn construct_shawl_run_args(name: &str, cwd: &Option<String>, opts: &CommonOpts)
     };
     if let Some(pass) = &opts.pass {
         shawl_args.push("--pass".to_string());
-        shawl_args.push(
-            pass.iter()
-                .map(|x| x.to_string())
-                .collect::<Vec<String>>()
-                .join(","),
-        );
+        shawl_args.push(pass.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(","));
     }
     if let Some(cwd) = &cwd {
         shawl_args.push("--cwd".to_string());

@@ -3,10 +3,7 @@ use log::{debug, error, info};
 use std::{io::BufRead, os::windows::process::CommandExt};
 use windows_service::{
     define_windows_service,
-    service::{
-        ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus,
-        ServiceType,
-    },
+    service::{ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus, ServiceType},
     service_control_handler::{self, ServiceControlHandlerResult},
     service_dispatcher,
 };
@@ -21,9 +18,7 @@ enum ProcessStatus {
     Terminated,
 }
 
-fn check_process(
-    child: &mut std::process::Child,
-) -> Result<ProcessStatus, Box<dyn std::error::Error>> {
+fn check_process(child: &mut std::process::Child) -> Result<ProcessStatus, Box<dyn std::error::Error>> {
     match child.try_wait() {
         Ok(None) => Ok(ProcessStatus::Running),
         Ok(Some(status)) => match status.code() {
@@ -193,9 +188,7 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
                 error!("Unable to launch command: {}", e);
                 service_exit_code = match e.raw_os_error() {
                     Some(win_code) => ServiceExitCode::Win32(win_code as u32),
-                    None => {
-                        ServiceExitCode::Win32(windows::Win32::Foundation::ERROR_PROCESS_ABORTED.0)
-                    }
+                    None => ServiceExitCode::Win32(windows::Win32::Foundation::ERROR_PROCESS_ABORTED.0),
                 };
                 break;
             }
@@ -209,18 +202,16 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
                 return;
             }
             if let Some(stdout) = stdout_option {
-                std::io::BufReader::new(stdout)
-                    .lines()
-                    .for_each(|line| match line {
-                        Ok(ref x) if !x.is_empty() => {
-                            if output_logs_need_target {
-                                debug!(target: "{shawl-cmd}", "{}", x);
-                            } else {
-                                debug!("stdout: {:?}", x);
-                            }
+                std::io::BufReader::new(stdout).lines().for_each(|line| match line {
+                    Ok(ref x) if !x.is_empty() => {
+                        if output_logs_need_target {
+                            debug!(target: "{shawl-cmd}", "{}", x);
+                        } else {
+                            debug!("stdout: {:?}", x);
                         }
-                        _ => (),
-                    });
+                    }
+                    _ => (),
+                });
             }
         });
 
@@ -231,18 +222,16 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
                 return;
             }
             if let Some(stderr) = stderr_option {
-                std::io::BufReader::new(stderr)
-                    .lines()
-                    .for_each(|line| match line {
-                        Ok(ref x) if !x.is_empty() => {
-                            if output_logs_need_target {
-                                debug!(target: "{shawl-cmd}", "{}", x);
-                            } else {
-                                debug!("stderr: {:?}", x);
-                            }
+                std::io::BufReader::new(stderr).lines().for_each(|line| match line {
+                    Ok(ref x) if !x.is_empty() => {
+                        if output_logs_need_target {
+                            debug!(target: "{shawl-cmd}", "{}", x);
+                        } else {
+                            debug!("stderr: {:?}", x);
                         }
-                        _ => (),
-                    });
+                    }
+                    _ => (),
+                });
             }
         });
 
@@ -255,9 +244,7 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
                         controls_accepted: ServiceControlAccept::empty(),
                         exit_code: ServiceExitCode::NO_ERROR,
                         checkpoint: 0,
-                        wait_hint: std::time::Duration::from_millis(
-                            opts.stop_timeout.unwrap_or(3000) + 1000,
-                        ),
+                        wait_hint: std::time::Duration::from_millis(opts.stop_timeout.unwrap_or(3000) + 1000),
                         process_id: None,
                     })?;
 
@@ -339,8 +326,7 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
                 }
                 Ok(ProcessStatus::Terminated) => {
                     info!("Command was terminated by a signal");
-                    service_exit_code =
-                        ServiceExitCode::Win32(windows::Win32::Foundation::ERROR_PROCESS_ABORTED.0);
+                    service_exit_code = ServiceExitCode::Win32(windows::Win32::Foundation::ERROR_PROCESS_ABORTED.0);
                     if should_restart_terminated_command(opts.restart, opts.no_restart) {
                         break 'inner;
                     } else {
@@ -349,8 +335,7 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
                 }
                 Err(e) => {
                     info!("Error trying to determine command status: {:?}", e);
-                    service_exit_code =
-                        ServiceExitCode::Win32(windows::Win32::Foundation::ERROR_PROCESS_ABORTED.0);
+                    service_exit_code = ServiceExitCode::Win32(windows::Win32::Foundation::ERROR_PROCESS_ABORTED.0);
                     break 'inner;
                 }
             }

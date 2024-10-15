@@ -3,10 +3,7 @@ use log::info;
 use clap::Parser;
 
 #[derive(clap::Parser, Debug)]
-#[clap(
-    name = "shawl-child",
-    about = "Dummy program to test wrapping with Shawl"
-)]
+#[clap(name = "shawl-child", about = "Dummy program to test wrapping with Shawl")]
 struct Cli {
     /// Run forever unless forcibly killed
     #[clap(long)]
