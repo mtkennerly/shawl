@@ -170,6 +170,13 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
                 None => Some(simplified.join(";").to_string()),
             };
         }
+        if !opts.path_prepend.is_empty() {
+            let simplified: Vec<_> = opts.path_prepend.iter().map(|x| crate::simplify_path(x)).collect();
+            path_env = match path_env {
+                Some(path) => Some(format!("{};{}", simplified.join(";"), path)),
+                None => Some(simplified.join(";").to_string()),
+            };
+        }
         if let Some(active_cwd) = &cwd {
             let active_cwd = crate::simplify_path(active_cwd);
             child_cmd.current_dir(&active_cwd);

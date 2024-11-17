@@ -127,6 +127,12 @@ fn construct_shawl_run_args(name: &str, cwd: &Option<String>, opts: &CommonOpts)
             shawl_args.push(quote(path));
         }
     }
+    if !opts.path_prepend.is_empty() {
+        for path in &opts.path_prepend {
+            shawl_args.push("--path-prepend".to_string());
+            shawl_args.push(quote(path));
+        }
+    }
     if let Some(priority) = opts.priority {
         shawl_args.push("--priority".to_string());
         shawl_args.push(priority.to_cli());

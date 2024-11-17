@@ -263,9 +263,13 @@ pub struct CommonOpts {
     #[clap(long, number_of_values = 1, value_parser = parse_env_var)]
     pub env: Vec<(String, String)>,
 
-    /// Additional directory to add to the PATH environment variable (repeatable)
+    /// Additional directory to append to the PATH environment variable (repeatable)
     #[clap(long, number_of_values = 1, value_parser = parse_canonical_path)]
     pub path: Vec<String>,
+
+    /// Additional directory to prepend to the PATH environment variable (repeatable)
+    #[clap(long, number_of_values = 1, value_parser = parse_canonical_path)]
+    pub path_prepend: Vec<String>,
 
     /// Process priority of the command to run as a service
     #[clap(long, value_parser = possible_values!(Priority, ALL))]
@@ -994,6 +998,45 @@ speculate::speculate! {
                         dependencies: vec![],
                         common: CommonOpts {
                             path: vec![p(&path1), p(&path2)],
+                            command: vec![s("foo")],
+                            ..Default::default()
+                        }
+                    }
+                },
+            );
+        }
+
+        it "accepts --path-prepend" {
+            let path = env!("CARGO_MANIFEST_DIR");
+            check_args(
+                &["shawl", "add", "--path-prepend", path, "--name", "foo", "--", "foo"],
+                Cli {
+                    sub: Subcommand::Add {
+                        name: s("foo"),
+                        cwd: None,
+                        dependencies: vec![],
+                        common: CommonOpts {
+                            path_prepend: vec![p(path)],
+                            command: vec![s("foo")],
+                            ..Default::default()
+                        }
+                    }
+                },
+            );
+        }
+
+        it "accepts --path-prepend multiple times" {
+            let path1 = format!("{}/target", env!("CARGO_MANIFEST_DIR"));
+            let path2 = format!("{}/src", env!("CARGO_MANIFEST_DIR"));
+            check_args(
+                &["shawl", "add", "--path-prepend", &path1, "--path-prepend", &path2, "--name", "foo", "--", "foo"],
+                Cli {
+                    sub: Subcommand::Add {
+                        name: s("foo"),
+                        cwd: None,
+                        dependencies: vec![],
+                        common: CommonOpts {
+                            path_prepend: vec![p(&path1), p(&path2)],
                             command: vec![s("foo")],
                             ..Default::default()
                         }

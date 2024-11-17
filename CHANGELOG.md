@@ -1,3 +1,7 @@
+## Unreleased
+
+* Added: `--path-prepend` option.
+
 ## v1.5.1 (2024-10-14)
 
 * Fixed: Old log files were not deleted when stored on a Windows network share.
