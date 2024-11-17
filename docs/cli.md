@@ -71,7 +71,9 @@ Options:
       --env <ENV>
           Additional environment variable in the format 'KEY=value' (repeatable)
       --path <PATH>
-          Additional directory to add to the PATH environment variable (repeatable)
+          Additional directory to append to the PATH environment variable (repeatable)
+      --path-prepend <path>
+          Additional directory to prepend to the PATH environment variable (repeatable)
       --priority <PRIORITY>
           Process priority of the command to run as a service [possible values: realtime, high,
           above-normal, normal, below-normal, idle]
@@ -135,7 +137,9 @@ Options:
       --env <ENV>
           Additional environment variable in the format 'KEY=value' (repeatable)
       --path <PATH>
-          Additional directory to add to the PATH environment variable (repeatable)
+          Additional directory to append to the PATH environment variable (repeatable)
+      --path-prepend <path>
+          Additional directory to prepend to the PATH environment variable (repeatable)
       --priority <PRIORITY>
           Process priority of the command to run as a service [possible values: realtime, high,
           above-normal, normal, below-normal, idle]

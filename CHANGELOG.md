@@ -1,4 +1,4 @@
-## Unreleased
+## v1.6.0 (2024-11-16)
 
 * Added: `--path-prepend` option.
 

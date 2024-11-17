@@ -268,7 +268,7 @@ pub struct CommonOpts {
     pub path: Vec<String>,
 
     /// Additional directory to prepend to the PATH environment variable (repeatable)
-    #[clap(long, number_of_values = 1, value_parser = parse_canonical_path)]
+    #[clap(long, value_name = "path", number_of_values = 1, value_parser = parse_canonical_path)]
     pub path_prepend: Vec<String>,
 
     /// Process priority of the command to run as a service
