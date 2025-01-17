@@ -232,5 +232,17 @@ speculate::speculate! {
             ).unwrap();
             assert!(pattern.is_match(&log));
         }
+
+        it "waits between restarts with --restart-delay" {
+            run_shawl(&["add", "--name", "shawl", "--restart-delay", "180", "--env", "RUST_LOG=shawl=debug", "--", &child(), "--exit", "1"]);
+            run_cmd(&["sc", "start", "shawl"]);
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            run_cmd(&["sc", "stop", "shawl"]);
+
+            let log = std::fs::read_to_string(log_file()).unwrap();
+            assert!(log.contains("Delaying 180 ms before restart"));
+            assert!(log.lines().filter(|line| line.contains("Sleeping another")).count() > 1);
+            assert!(log.contains("Restart delay is complete"));
+        }
     }
 }

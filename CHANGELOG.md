@@ -1,3 +1,7 @@
+## Unreleased
+
+* Added: `--restart-delay` option.
+
 ## v1.6.0 (2024-11-16)
 
 * Added: `--path-prepend` option.

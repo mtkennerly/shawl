@@ -140,8 +140,31 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
         None => windows::Win32::System::Threading::INHERIT_CALLER_PRIORITY.0,
     };
 
+    let mut restart_after: Option<std::time::Instant> = None;
+
     debug!("Entering main service loop");
     'outer: loop {
+        if let Some(delay) = restart_after {
+            match shutdown_rx.recv_timeout(std::time::Duration::from_millis(1)) {
+                Ok(_) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    info!("Cancelling before launch");
+                    break 'outer;
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => (),
+            };
+
+            let now = std::time::Instant::now();
+            if now < delay {
+                let step = (delay - now).min(std::time::Duration::from_millis(50));
+                debug!("Sleeping another {} ms", step.as_millis());
+                std::thread::sleep(step);
+                continue;
+            } else {
+                info!("Restart delay is complete");
+                restart_after = None;
+            }
+        }
+
         info!("Launching command");
         let should_log_cmd = !&opts.no_log_cmd;
         let mut child_cmd = std::process::Command::new(&program);
@@ -353,6 +376,11 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
         }
         if let Err(e) = stderr_logger.join() {
             error!("Unable to join stderr logger thread: {:?}", e);
+        }
+
+        if let Some(delay) = opts.restart_delay {
+            info!("Delaying {delay} ms before restart");
+            restart_after = Some(std::time::Instant::now() + std::time::Duration::from_millis(delay));
         }
     }
     debug!("Exited main service loop");

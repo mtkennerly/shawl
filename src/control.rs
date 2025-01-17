@@ -48,6 +48,10 @@ pub fn add_service(name: String, cwd: Option<String>, dependencies: &[String], o
 
 fn construct_shawl_run_args(name: &str, cwd: &Option<String>, opts: &CommonOpts) -> Vec<String> {
     let mut shawl_args = vec!["run".to_string(), "--name".to_string(), quote(name)];
+    if let Some(delay) = opts.restart_delay {
+        shawl_args.push("--restart-delay".to_string());
+        shawl_args.push(delay.to_string());
+    }
     if let Some(st) = opts.stop_timeout {
         shawl_args.push("--stop-timeout".to_string());
         shawl_args.push(st.to_string());
@@ -304,6 +308,20 @@ speculate::speculate! {
                     }
                 ),
                 vec!["run", "--name", "shawl", "--pass", "1,10"],
+            );
+        }
+
+        it "handles --restart-delay" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &None,
+                    &CommonOpts {
+                        restart_delay: Some(1500),
+                        ..Default::default()
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--restart-delay", "1500"],
             );
         }
 

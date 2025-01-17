@@ -214,6 +214,10 @@ pub struct CommonOpts {
     )]
     pub restart_if_not: Vec<i32>,
 
+    /// How long to wait before restarting the wrapped process
+    #[clap(long, value_name = "ms")]
+    pub restart_delay: Option<u64>,
+
     /// How long to wait in milliseconds between sending the wrapped process
     /// a ctrl-C event and forcibly killing it [default: 3000]
     #[clap(long, value_name = "ms")]
@@ -584,6 +588,23 @@ speculate::speculate! {
                     clap::error::ErrorKind::ArgumentConflict,
                 );
             }
+        }
+
+        it "accepts --restart-delay" {
+            check_args(
+                &["shawl", "run", "--restart-delay", "1500", "--", "foo"],
+                Cli {
+                    sub: Subcommand::Run {
+                        name: s("Shawl"),
+                        cwd: None,
+                        common: CommonOpts {
+                            restart_delay: Some(1500),
+                            command: vec![s("foo")],
+                            ..Default::default()
+                        }
+                    }
+                },
+            );
         }
 
         it "accepts --stop-timeout" {
