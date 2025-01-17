@@ -17,19 +17,33 @@ Use the latest version of Rust.
 ## Release
 Commands assume you are using [Git Bash](https://git-scm.com) on Windows:
 
-* Add targets:
-  * 32-bit: `rustup target add i686-pc-windows-msvc`
-  * 64-bit: `rustup target add x86_64-pc-windows-msvc`
-* Install tool for generating license bundle:
-  * `cargo install cargo-lichking`
-* Prepare release:
-  ```
-  export VERSION=$(cargo pkgid | cut -d# -f2 | cut -d: -f2)
-  rm -rf dist
-  mkdir dist
-  cargo build --release --target i686-pc-windows-msvc
-  cargo build --release --target x86_64-pc-windows-msvc
-  cp target/i686-pc-windows-msvc/release/shawl.exe dist/shawl-v$VERSION-win32.exe
-  cp target/x86_64-pc-windows-msvc/release/shawl.exe dist/shawl-v$VERSION-win64.exe
-  cargo lichking bundle --file dist/shawl-v$VERSION-legal.txt
-  ```
+### Dependencies (one-time)
+```bash
+pip install invoke
+cargo install cargo-lichking
+```
+
+### Process
+* Update version in `CHANGELOG.md`
+* Update version in `Cargo.toml`
+* Run `invoke prerelease`
+* Run `git add` for all relevant changes
+* Run `invoke release`
+  * This will create a new commit/tag and push them.
+  * Manually create a release on GitHub and attach the workflow build artifacts
+    (plus `dist/*-legal.zip`).
+* Run `cargo publish`
+* Run `invoke release-winget`
+  * When the script opens VSCode and pauses,
+    manually edit `manifests/m/mtkennerly/shawl/${VERSION}/mtkennerly.shawl.locale.en-US.yaml`
+    to add the `ReleaseNotes` and `ReleaseNotesUrl` fields:
+
+    ```yaml
+    ReleaseNotes: |-
+      <copy/paste from CHANGELOG.md>
+    ReleaseNotesUrl: https://github.com/mtkennerly/shawl/releases/tag/v${VERSION}
+    ```
+
+    Close the file, and the script will continue.
+  * This will automatically push a branch to a fork of https://github.com/microsoft/winget-pkgs .
+  * Manually open a pull request for that branch.
