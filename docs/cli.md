@@ -43,6 +43,8 @@ Options:
           Restart the command if the exit code is one of these (comma-separated)
       --restart-if-not <codes>
           Restart the command if the exit code is not one of these (comma-separated)
+      --restart-delay <ms>
+          How long to wait before restarting the wrapped process
       --stop-timeout <ms>
           How long to wait in milliseconds between sending the wrapped process a ctrl-C event and
           forcibly killing it [default: 3000]
@@ -109,6 +111,8 @@ Options:
           Restart the command if the exit code is one of these (comma-separated)
       --restart-if-not <codes>
           Restart the command if the exit code is not one of these (comma-separated)
+      --restart-delay <ms>
+          How long to wait before restarting the wrapped process
       --stop-timeout <ms>
           How long to wait in milliseconds between sending the wrapped process a ctrl-C event and
           forcibly killing it [default: 3000]

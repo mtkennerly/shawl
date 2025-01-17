@@ -1,4 +1,4 @@
-## Unreleased
+## v1.7.0 (2025-01-16)
 
 * Added: `--restart-delay` option.
 
