@@ -79,6 +79,11 @@ If the service needs to read and write files,
 you may also need to grant the Network Service permissions to the directory that the service wants to access.
 More information about Windows service user accounts [can be found here](https://stackoverflow.com/questions/510170).
 
+### Working directory
+The default working directory for Windows services is `C:\Windows\System32`.
+You may want to take the precaution of setting a different working directory
+by using Shawl's `--cwd` option.
+
 ### Recovery
 If you want to use the service recovery feature of Windows itself
 when Shawl gives up trying to restart the wrapped command,
