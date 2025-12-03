@@ -8,6 +8,69 @@ use windows_service::{
     service_dispatcher,
 };
 
+/// Kill a process and all its child processes on Windows
+fn kill_process_tree(child: &mut std::process::Child) {
+    use windows::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE, PROCESS_QUERY_INFORMATION};
+    use windows::Win32::Foundation::CloseHandle;
+    
+    // Get the process ID
+    let pid = child.id();
+    
+    unsafe {
+        // First, kill all child processes recursively
+        kill_child_processes(pid);
+        
+        // Then kill the main process
+        if let Ok(handle) = OpenProcess(PROCESS_TERMINATE | PROCESS_QUERY_INFORMATION, false, pid) {
+            let _ = TerminateProcess(handle, 1);
+            let _ = CloseHandle(handle);
+        }
+    }
+    
+    // Fallback to the standard kill method
+    let _ = child.kill();
+}
+
+/// Kill all child processes of a given parent process ID
+unsafe fn kill_child_processes(parent_pid: u32) {
+    use windows::Win32::System::Diagnostics::ToolHelp::{CreateToolhelp32Snapshot, Process32First, Process32Next, PROCESSENTRY32, TH32CS_SNAPPROCESS};
+    use windows::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
+    use windows::Win32::Foundation::CloseHandle;
+    
+    // Create a snapshot of all processes
+    let snapshot = match CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) {
+        Ok(s) => s,
+        Err(_) => return,
+    };
+    
+    let mut entry = PROCESSENTRY32 {
+        dwSize: std::mem::size_of::<PROCESSENTRY32>() as u32,
+        ..Default::default()
+    };
+    
+    // Iterate through all processes
+    if Process32First(snapshot, &mut entry).is_ok() {
+        loop {
+            // If this process's parent is our target, kill it
+            if entry.th32ParentProcessID == parent_pid {
+                if let Ok(handle) = OpenProcess(PROCESS_TERMINATE, false, entry.th32ProcessID) {
+                    let _ = TerminateProcess(handle, 1);
+                    let _ = CloseHandle(handle);
+                }
+                // Recursively kill children of this process
+                kill_child_processes(entry.th32ProcessID);
+            }
+            
+            // Move to next process
+            if Process32Next(snapshot, &mut entry).is_err() {
+                break;
+            }
+        }
+    }
+    
+    let _ = CloseHandle(snapshot);
+}
+
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 
 define_windows_service!(ffi_service_main, service_main);
@@ -302,7 +365,7 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
                                     std::thread::sleep(std::time::Duration::from_millis(50))
                                 } else {
                                     info!("Killing command because stop timeout expired",);
-                                    let _ = child.kill();
+                                    kill_process_tree(&mut child);
                                     service_exit_code = ServiceExitCode::NO_ERROR;
                                     break;
                                 }
@@ -430,6 +493,59 @@ speculate::speculate! {
             assert!(!should_restart_terminated_command(false, false));
             assert!(should_restart_terminated_command(true, false));
             assert!(!should_restart_terminated_command(false, true));
+        }
+    }
+
+    describe "kill_process_tree" {
+        it "can be called without panicking on a non-existent process" {
+            // Create a child process that immediately exits
+            let mut child = std::process::Command::new("cmd")
+                .args(&["/C", "exit", "0"])
+                .spawn()
+                .unwrap();
+            
+            // Wait for it to exit
+            let _ = child.wait();
+            
+            // Calling kill_process_tree on an already-exited process should not panic
+            kill_process_tree(&mut child);
+        }
+
+        it "handles process ID retrieval" {
+            // Test that we can get a process ID from a spawned process
+            let mut child = std::process::Command::new("cmd")
+                .args(&["/C", "timeout", "/t", "1", "/nobreak"])
+                .spawn()
+                .unwrap();
+            
+            let pid = child.id();
+            assert!(pid > 0);
+            
+            // Kill it
+            kill_process_tree(&mut child);
+            
+            // Wait to ensure it's killed
+            let _ = child.wait();
+        }
+    }
+
+    describe "kill_child_processes" {
+        it "handles non-existent process ID gracefully" {
+            // Should not panic when given a non-existent PID
+            unsafe {
+                kill_child_processes(0xFFFFFFFF); // Invalid PID
+            }
+        }
+
+        it "can enumerate processes without crashing" {
+            // Test that the snapshot creation and enumeration works
+            // This is a basic smoke test to ensure the Windows APIs are called correctly
+            unsafe {
+                // Use a PID that likely exists (like the current process)
+                let current_pid = std::process::id();
+                kill_child_processes(current_pid);
+                // Should complete without panicking
+            }
         }
     }
 }
