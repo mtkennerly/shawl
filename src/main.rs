@@ -1,6 +1,8 @@
 mod cli;
 mod control;
 #[cfg(windows)]
+mod process_job;
+#[cfg(windows)]
 mod service;
 
 use crate::cli::{evaluate_cli, Subcommand};
