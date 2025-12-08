@@ -1,5 +1,4 @@
-use crate::cli;
-use crate::process_job::ProcessJob;
+use crate::{cli, process_job::ProcessJob};
 use log::{debug, error, info};
 use std::{io::BufRead, os::windows::process::CommandExt};
 use windows_service::{

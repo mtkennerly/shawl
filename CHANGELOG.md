@@ -1,3 +1,8 @@
+## Unreleased
+
+* Added: `--kill-process-tree` option to ensure child processes are also terminated.
+  (Contributed by [nitaysol](https://github.com/mtkennerly/shawl/pull/71))
+
 ## v1.7.0 (2025-01-16)
 
 * Added: `--restart-delay` option.
