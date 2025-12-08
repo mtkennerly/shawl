@@ -245,4 +245,82 @@ speculate::speculate! {
             assert!(log.contains("Restart delay is complete"));
         }
     }
+
+    describe "kill process tree" {
+
+        // returns ALL shawl-child.exe processes (child + grandchild)
+        fn find_tree_processes() -> Vec<u32> {
+            use sysinfo::System;
+
+            let mut s = System::new_all();
+            s.refresh_all();
+
+            s.processes()
+                .iter()
+                .filter(|(_, p)| p.name().eq_ignore_ascii_case("shawl-child.exe"))
+                .map(|(pid, _)| pid.as_u32())
+                .collect()
+        }
+
+        before {
+            run_cmd(&["sc", "stop", "shawl_tree"]);
+            run_cmd(&["sc", "delete", "shawl_tree"]);
+        }
+
+        after {
+            run_cmd(&["sc", "stop", "shawl_tree"]);
+            run_cmd(&["sc", "delete", "shawl_tree"]);
+        }
+
+        it "kills child + grandchild processes when --kill-process-tree is enabled" {
+            // Register service with tree-spawning option
+            run_shawl(&[
+                "add", "--name", "shawl_tree",
+                "--kill-process-tree",
+                "--",
+                &child(), "--spawn-grandchild"
+            ]);
+
+            run_cmd(&["sc", "start", "shawl_tree"]);
+            std::thread::sleep(std::time::Duration::from_millis(800));
+
+            // BEFORE STOP: expect child + grandchild processes
+            let before = find_tree_processes();
+            assert!(
+                before.len() >= 2,
+                "Expected at least 2 processes (child + grandchild), got: {:?}",
+                before
+            );
+
+            // Stop service - job object should kill the entire process tree
+            run_cmd(&["sc", "stop", "shawl_tree"]);
+            std::thread::sleep(std::time::Duration::from_millis(800));
+
+            // AFTER STOP: ALL shawl-child.exe processes must be gone
+            let after = find_tree_processes();
+            assert!(
+                after.is_empty(),
+                "All child + grandchild processes must be terminated, remaining: {:?}",
+                after
+            );
+        }
+
+        it "does not break normal execution when --kill-process-tree is set without grandchildren" {
+            run_shawl(&[
+                "add", "--name", "shawl_tree",
+                "--kill-process-tree",
+                "--",
+                &child()
+            ]);
+
+            run_cmd(&["sc", "start", "shawl_tree"]);
+            run_cmd(&["sc", "stop", "shawl_tree"]);
+
+            let sc_output = run_cmd(&["sc", "query", "shawl_tree"]);
+            let stdout = String::from_utf8_lossy(&sc_output.stdout);
+
+            assert!(stdout.contains("STATE              : 1  STOPPED"));
+            assert!(stdout.contains("WIN32_EXIT_CODE    : 0"));
+        }
+    }
 }

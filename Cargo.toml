@@ -15,12 +15,19 @@ ctrlc = "3.4.5"
 dunce = "1.0.5"
 flexi_logger = "0.29.3"
 log = "0.4.22"
-windows = { version = "0.58.0", features = ["Win32_System_Console", "Win32_System_Threading"] }
+windows = { version = "0.58.0", features = [
+    "Win32_System_Console",
+    "Win32_System_Threading",
+    "Win32_System_JobObjects",
+    "Win32_Foundation",
+    "Win32_Security",
+] }
 windows-service = "0.7.0"
 
 [dev-dependencies]
 regex = "1.11.0"
 speculate = "0.1.2"
+sysinfo = "0.31"
 
 [build-dependencies]
 winres = "0.1.12"

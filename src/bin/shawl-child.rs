@@ -16,6 +16,10 @@ struct Cli {
     /// Test option, prints an extra line to stdout if received
     #[clap(long)]
     test: bool,
+
+    /// Spawn a grandchild process for testing process job killing
+    #[clap(long)]
+    spawn_grandchild: bool,
 }
 
 fn prepare_logging() -> Result<(), Box<dyn std::error::Error>> {
@@ -56,6 +60,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("shawl-child message on stdout");
     eprintln!("shawl-child message on stderr");
 
+    if cli.spawn_grandchild {
+        info!("Spawning grandchild process...");
+
+        let exe = std::env::current_exe()?;
+
+        std::process::Command::new(&exe).arg("--infinite").spawn()?;
+
+        info!("Grandchild spawned");
+    }
     if cli.test {
         println!("shawl-child test option received");
     }

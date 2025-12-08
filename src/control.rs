@@ -141,6 +141,9 @@ fn construct_shawl_run_args(name: &str, cwd: &Option<String>, opts: &CommonOpts)
         shawl_args.push("--priority".to_string());
         shawl_args.push(priority.to_cli());
     }
+    if opts.kill_process_tree {
+        shawl_args.push("--kill-process-tree".to_string());
+    }
     shawl_args
 }
 
@@ -581,6 +584,20 @@ speculate::speculate! {
                     }
                 ),
                 vec!["run", "--name", "shawl", "--priority", "above-normal"],
+            );
+        }
+
+        it "handles --kill-process-tree" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &None,
+                    &CommonOpts {
+                        kill_process_tree: true,
+                        ..Default::default()
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--kill-process-tree"],
             );
         }
     }

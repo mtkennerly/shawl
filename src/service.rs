@@ -1,4 +1,5 @@
 use crate::cli;
+use crate::process_job::ProcessJob;
 use log::{debug, error, info};
 use std::{io::BufRead, os::windows::process::CommandExt};
 use windows_service::{
@@ -142,6 +143,22 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
 
     let mut restart_after: Option<std::time::Instant> = None;
 
+    // Create a process job that kills all child processes when closed (if kill_process_tree is enabled)
+    let mut process_job: Option<ProcessJob> = if opts.kill_process_tree {
+        match ProcessJob::create_kill_on_close() {
+            Ok(pj) => {
+                info!("Created process job for process group management");
+                Some(pj)
+            }
+            Err(e) => {
+                error!("Failed to create process job: {:?}", e);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     debug!("Entering main service loop");
     'outer: loop {
         if let Some(delay) = restart_after {
@@ -224,6 +241,15 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
             }
         };
 
+        // Assign process to job (if kill_process_tree is enabled)
+        if let Some(ref pj) = process_job {
+            if let Err(e) = pj.assign(&child) {
+                error!("Failed to assign process to job: {:?}", e);
+            } else {
+                debug!("Assigned process (PID: {}) to job", child.id());
+            }
+        }
+
         // Log stdout.
         let output_logs_need_target = opts.log_cmd_as.is_some();
         let stdout_option = child.stdout.take();
@@ -301,8 +327,15 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
                                 if start_time.elapsed().as_millis() < (*stop_timeout).into() {
                                     std::thread::sleep(std::time::Duration::from_millis(50))
                                 } else {
-                                    info!("Killing command because stop timeout expired",);
-                                    let _ = child.kill();
+                                    info!("Killing command because stop timeout expired");
+                                    if let Some(pj) = process_job.take() {
+                                        // Drop the job, which will terminate all child processes
+                                        info!("Dropping process job to terminate all child processes");
+                                        drop(pj);
+                                    } else {
+                                        // Fallback to standard kill
+                                        let _ = child.kill();
+                                    }
                                     service_exit_code = ServiceExitCode::NO_ERROR;
                                     break;
                                 }
@@ -430,6 +463,101 @@ speculate::speculate! {
             assert!(!should_restart_terminated_command(false, false));
             assert!(should_restart_terminated_command(true, false));
             assert!(!should_restart_terminated_command(false, true));
+        }
+    }
+
+    describe "process_job" {
+        it "can create a process job" {
+            assert!(ProcessJob::create_kill_on_close().is_ok());
+        }
+
+        it "kills the assigned process when the job is dropped" {
+            use std::{thread, time::Duration};
+
+            // Create job
+            let job = ProcessJob::create_kill_on_close().unwrap();
+
+            // Spawn long-running dummy command
+            let mut child = std::process::Command::new("cmd")
+                .args(&["/C", "timeout", "/t", "60", "/nobreak"])
+                .spawn()
+                .unwrap();
+
+            // Assign to job
+            assert!(job.assign(&child).is_ok());
+
+            // Drop the job → should terminate the child
+            drop(job);
+
+            // Give Windows a small time window to process the kill
+            thread::sleep(Duration::from_millis(150));
+
+            // Child must be dead
+            let status = child.try_wait()
+                .expect("Failed to poll child process status");
+
+            assert!(
+                status.is_some(),
+                "Child process should have been terminated when ProcessJob was dropped"
+            );
+        }
+
+        it "kills child and grandchild processes when job is dropped" {
+            use std::{thread, time::Duration};
+            use sysinfo::{System, Pid};
+
+            let job = ProcessJob::create_kill_on_close().unwrap();
+
+            // Parent process spawns a grandchild
+            let child = std::process::Command::new("powershell")
+                .arg("-NoProfile")
+                .arg("-Command")
+                .arg("Start-Process powershell -ArgumentList '-NoProfile','-Command','Start-Sleep 60'; Start-Sleep 60")
+                .spawn()
+                .expect("Failed to spawn parent process");
+
+            job.assign(&child).expect("Failed to assign job");
+
+            let parent_pid = child.id();
+
+            // Let grandchildren spawn
+            thread::sleep(Duration::from_millis(300));
+
+            let mut system = System::new_all();
+            system.refresh_all();
+
+            // Find grandchildren (children of the parent PID)
+            let grandchildren: Vec<u32> = system
+                .processes()
+                .iter()
+                .filter(|(_, p)| p.parent() == Some(Pid::from_u32(parent_pid)))
+                .map(|(pid, _)| pid.as_u32())
+                .collect();
+
+            assert!(
+                !grandchildren.is_empty(),
+                "Expected parent to spawn at least one grandchild"
+            );
+
+            // Drop job -> kill whole tree
+            drop(job);
+
+            thread::sleep(Duration::from_millis(300));
+            system.refresh_all();
+
+            // Parent should be dead
+            let parent_alive = system.process(Pid::from_u32(parent_pid)).is_some();
+            assert!(!parent_alive, "Parent should be terminated");
+
+            // Grandchildren should be dead too
+            for gc_pid in grandchildren {
+                let alive = system.process(Pid::from_u32(gc_pid)).is_some();
+                assert!(
+                    !alive,
+                    "Grandchild process {} should also be terminated",
+                    gc_pid
+                );
+            }
         }
     }
 }

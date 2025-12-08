@@ -279,6 +279,11 @@ pub struct CommonOpts {
     #[clap(long, value_parser = possible_values!(Priority, ALL))]
     pub priority: Option<Priority>,
 
+    /// Kill the entire process tree when the service stops.
+    /// Uses a Windows Job Object to track and terminate all child processes automatically.
+    #[clap(long)]
+    pub kill_process_tree: bool,
+
     /// Command to run as a service
     #[clap(required(true), last(true))]
     pub command: Vec<String>,
@@ -944,6 +949,23 @@ speculate::speculate! {
                         cwd: None,
                         common: CommonOpts {
                             pass_start_args: true,
+                            command: vec![s("foo")],
+                            ..Default::default()
+                        }
+                    }
+                },
+            );
+        }
+
+        it "accepts --kill-process-tree" {
+            check_args(
+                &["shawl", "run", "--kill-process-tree", "--", "foo"],
+                Cli {
+                    sub: Subcommand::Run {
+                        name: s("Shawl"),
+                        cwd: None,
+                        common: CommonOpts {
+                            kill_process_tree: true,
                             command: vec![s("foo")],
                             ..Default::default()
                         }
