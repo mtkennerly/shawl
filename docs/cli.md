@@ -79,6 +79,9 @@ Options:
       --priority <PRIORITY>
           Process priority of the command to run as a service [possible values: realtime, high,
           above-normal, normal, below-normal, idle]
+      --kill-process-tree
+          Kill the entire process tree when the service stops. Uses a Windows Job Object to track
+          and terminate all child processes automatically
       --cwd <path>
           Working directory in which to run the command. You may provide a relative path, and it
           will be converted to an absolute one
@@ -147,6 +150,9 @@ Options:
       --priority <PRIORITY>
           Process priority of the command to run as a service [possible values: realtime, high,
           above-normal, normal, below-normal, idle]
+      --kill-process-tree
+          Kill the entire process tree when the service stops. Uses a Windows Job Object to track
+          and terminate all child processes automatically
       --cwd <path>
           Working directory in which to run the command. Must be an absolute path
       --name <NAME>

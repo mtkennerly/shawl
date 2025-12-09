@@ -1,4 +1,4 @@
-## Unreleased
+## v1.8.0 (2025-12-08)
 
 * Added: `--kill-process-tree` option to ensure child processes are also terminated.
   (Contributed by [nitaysol](https://github.com/mtkennerly/shawl/pull/71))
