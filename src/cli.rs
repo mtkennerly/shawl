@@ -284,6 +284,14 @@ pub struct CommonOpts {
     #[clap(long)]
     pub kill_process_tree: bool,
 
+    /// Abort shawl if ctrl-C or ctrl-Break is received unexpectedly.
+    /// Use this when running shawl directly from a terminal so that Ctrl+C stops it.
+    /// Or if you expect shawl to handle those ctrl c.
+    /// Using this as a service means that, when the service or the child receive ctrl c, 
+    /// it may throw an STACK_BUFFER_OVERRUN error to windows
+    #[clap(long)]
+    pub interactive: bool,
+
     /// Command to run as a service
     #[clap(required(true), last(true))]
     pub command: Vec<String>,
@@ -966,6 +974,23 @@ speculate::speculate! {
                         cwd: None,
                         common: CommonOpts {
                             kill_process_tree: true,
+                            command: vec![s("foo")],
+                            ..Default::default()
+                        }
+                    }
+                },
+            );
+        }
+
+        it "accepts --interactive" {
+            check_args(
+                &["shawl", "run", "--interactive", "--", "foo"],
+                Cli {
+                    sub: Subcommand::Run {
+                        name: s("Shawl"),
+                        cwd: None,
+                        common: CommonOpts {
+                            interactive: true,
                             command: vec![s("foo")],
                             ..Default::default()
                         }

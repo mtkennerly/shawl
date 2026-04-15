@@ -88,12 +88,13 @@ pub fn run_service(start_arguments: Vec<std::ffi::OsString>) -> windows_service:
     };
     let pass = &opts.pass.unwrap_or_else(|| vec![0]);
     let stop_timeout = &opts.stop_timeout.unwrap_or(3000_u64);
+    let interactive = opts.interactive;
     let mut service_exit_code = ServiceExitCode::NO_ERROR;
 
     let ignore_ctrlc = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let ignore_ctrlc2 = ignore_ctrlc.clone();
     ctrlc::set_handler(move || {
-        if !ignore_ctrlc2.load(std::sync::atomic::Ordering::SeqCst) {
+        if interactive && !ignore_ctrlc2.load(std::sync::atomic::Ordering::SeqCst) {
             std::process::abort();
         }
     })
