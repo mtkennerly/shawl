@@ -20,6 +20,10 @@ struct Cli {
     /// Spawn a grandchild process for testing process job killing
     #[clap(long)]
     spawn_grandchild: bool,
+
+    /// Generate a ctrl-C event
+    #[clap(long)]
+    send_ctrlc: bool,
 }
 
 fn prepare_logging() -> Result<(), Box<dyn std::error::Error>> {
@@ -60,6 +64,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("shawl-child message on stdout");
     eprintln!("shawl-child message on stderr");
 
+    if cli.send_ctrlc {
+        info!("Sending ctrl-C event");
+        unsafe {
+            windows::Win32::System::Console::GenerateConsoleCtrlEvent(windows::Win32::System::Console::CTRL_C_EVENT, 0)
+                .unwrap();
+        }
+        info!("Sent ctrl-C event");
+    }
+
     if cli.spawn_grandchild {
         info!("Spawning grandchild process...");
 
@@ -80,13 +93,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let running = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
     let running2 = running.clone();
 
-    ctrlc::set_handler(move || {
-        if cli.infinite {
-            info!("Ignoring ctrl-C");
-        } else {
-            running2.store(false, std::sync::atomic::Ordering::SeqCst);
-        }
-    })?;
+    if !cli.send_ctrlc {
+        ctrlc::set_handler(move || {
+            if cli.infinite {
+                info!("Ignoring ctrl-C");
+            } else {
+                running2.store(false, std::sync::atomic::Ordering::SeqCst);
+            }
+        })?;
+    }
 
     while running.load(std::sync::atomic::Ordering::SeqCst) {
         std::thread::sleep(std::time::Duration::from_millis(500));

@@ -244,6 +244,49 @@ speculate::speculate! {
             assert!(log.lines().filter(|line| line.contains("Sleeping another")).count() > 1);
             assert!(log.contains("Restart delay is complete"));
         }
+
+        it "does not quit when the child process sends a ctrl-C event" {
+            run_shawl(&["add", "--name", "shawl", "--no-restart", "--", &child(), "--send-ctrlc"]);
+            run_cmd(&["sc", "start", "shawl"]);
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            run_cmd(&["sc", "stop", "shawl"]);
+
+            let log = std::fs::read_to_string(log_file()).unwrap();
+            println!(">>>>>>> {}", &log);
+            assert!(log.contains("[INFO] Command exited with code -1073741510"));
+
+            let sc_output = run_cmd(&["sc", "query", "shawl"]);
+            let stdout = String::from_utf8_lossy(&sc_output.stdout);
+            println!(">>>>>>> {}", stdout);
+
+            assert!(stdout.contains("STATE              : 1  STOPPED"));
+            assert!(stdout.contains("WIN32_EXIT_CODE    : 1066  (0x42a)"));
+        }
+
+        it "quits with --interactive when the child process sends a ctrl-C event" {
+            run_shawl(&["add", "--name", "shawl", "--interactive", "--no-restart", "--", &child(), "--send-ctrlc"]);
+            run_cmd(&["sc", "start", "shawl"]);
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            run_cmd(&["sc", "stop", "shawl"]);
+
+            let log = std::fs::read_to_string(log_file()).unwrap();
+            println!(">>>>>>> {}", &log);
+
+            let sc_output = run_cmd(&["sc", "query", "shawl"]);
+            let stdout = String::from_utf8_lossy(&sc_output.stdout);
+            println!(">>>>>>> {}", stdout);
+
+            assert!(stdout.contains("STATE              : 1  STOPPED"));
+
+            // TODO: Not sure why this varies between the two outcomes.
+            if !log.contains("[INFO] Command exited") {
+                assert!(stdout.contains("WIN32_EXIT_CODE    : 1067  (0x42b)"));
+            } else if log.contains("[INFO] Command exited with code -1073741510") {
+                assert!(stdout.contains("WIN32_EXIT_CODE    : 1066  (0x42a)"));
+            } else {
+                panic!("Unexpected output");
+            }
+        }
     }
 
     describe "kill process tree" {

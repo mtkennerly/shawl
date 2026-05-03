@@ -284,11 +284,9 @@ pub struct CommonOpts {
     #[clap(long)]
     pub kill_process_tree: bool,
 
-    /// Abort shawl if ctrl-C or ctrl-Break is received unexpectedly.
-    /// Use this when running shawl directly from a terminal so that Ctrl+C stops it.
-    /// Or if you expect shawl to handle those ctrl c.
-    /// Using this as a service means that, when the service or the child receive ctrl c,
-    /// it may throw an STACK_BUFFER_OVERRUN error to windows
+    /// Abort if ctrl-C or ctrl-break is received unexpectedly.
+    /// Use this option if you're running Shawl from a terminal and want it to respect ctrl-C,
+    /// or if you want the wrapped command to be able to send a ctrl-C event that stops Shawl.
     #[clap(long)]
     pub interactive: bool,
 

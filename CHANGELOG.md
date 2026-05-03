@@ -1,3 +1,11 @@
+## Unreleased
+
+* Fixed: If the wrapped command sent its own ctrl-C event,
+  that would cause Shawl to exit unexpectedly.
+  (Contributed by [FGeloso](https://github.com/mtkennerly/shawl/pull/75))
+* Added: `--interactive` option to preserve that previous behavior.
+  (Contributed by [FGeloso](https://github.com/mtkennerly/shawl/pull/75))
+
 ## v1.8.0 (2025-12-08)
 
 * Added: `--kill-process-tree` option to ensure child processes are also terminated.
