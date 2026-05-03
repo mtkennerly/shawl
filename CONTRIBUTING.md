@@ -24,8 +24,6 @@ cargo install cargo-lichking
 ```
 
 ### Process
-* Update version in `CHANGELOG.md`
-* Update version in `Cargo.toml`
 * Run `invoke prerelease`
 * Run `git add` for all relevant changes
 * Run `invoke release`
@@ -34,16 +32,5 @@ cargo install cargo-lichking
     (plus `dist/*-legal.zip`).
 * Run `cargo publish`
 * Run `invoke release-winget`
-  * When the script opens VSCode and pauses,
-    manually edit `manifests/m/mtkennerly/shawl/${VERSION}/mtkennerly.shawl.locale.en-US.yaml`
-    to add the `ReleaseNotes` and `ReleaseNotesUrl` fields:
-
-    ```yaml
-    ReleaseNotes: |-
-      <copy/paste from CHANGELOG.md>
-    ReleaseNotesUrl: https://github.com/mtkennerly/shawl/releases/tag/v${VERSION}
-    ```
-
-    Close the file, and the script will continue.
   * This will automatically push a branch to a fork of https://github.com/microsoft/winget-pkgs .
   * Manually open a pull request for that branch.
