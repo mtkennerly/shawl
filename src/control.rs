@@ -144,6 +144,9 @@ fn construct_shawl_run_args(name: &str, cwd: &Option<String>, opts: &CommonOpts)
     if opts.kill_process_tree {
         shawl_args.push("--kill-process-tree".to_string());
     }
+    if opts.interactive {
+        shawl_args.push("--interactive".to_string());
+    }
     shawl_args
 }
 
@@ -598,6 +601,20 @@ speculate::speculate! {
                     }
                 ),
                 vec!["run", "--name", "shawl", "--kill-process-tree"],
+            );
+        }
+
+        it "handles --interactive" {
+            assert_eq!(
+                construct_shawl_run_args(
+                    &s("shawl"),
+                    &None,
+                    &CommonOpts {
+                        interactive: true,
+                        ..Default::default()
+                    }
+                ),
+                vec!["run", "--name", "shawl", "--interactive"],
             );
         }
     }
