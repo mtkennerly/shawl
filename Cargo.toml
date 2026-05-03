@@ -2,7 +2,7 @@
 name = "shawl"
 version = "1.8.0"
 authors = ["mtkennerly <mtkennerly@gmail.com>"]
-edition = "2021"
+edition = "2024"
 description = "Windows service wrapper for arbitrary commands"
 repository = "https://github.com/mtkennerly/shawl"
 readme = "README.md"

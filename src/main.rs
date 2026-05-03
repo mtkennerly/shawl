@@ -5,7 +5,7 @@ mod process_job;
 #[cfg(windows)]
 mod service;
 
-use crate::cli::{evaluate_cli, Subcommand};
+use crate::cli::{Subcommand, evaluate_cli};
 use log::{debug, error};
 
 /// Simplify local UNC paths since some programs (notably cmd.exe) don't like them.
