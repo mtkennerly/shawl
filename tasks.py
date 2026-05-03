@@ -136,7 +136,8 @@ def release_winget(ctx, target="/dev/_forks/winget-pkgs"):
 
         spec = target / f"manifests/m/mtkennerly/shawl/{version}/mtkennerly.shawl.locale.en-US.yaml"
         spec_content = spec.read_bytes().decode("utf-8")
-        spec_content = spec_content.replace("Moniker: shawl", f"Moniker: shawl\nReleaseNotes: |-\n{changelog}\nReleaseNotesUrl: https://github.com/mtkennerly/shawl/releases/tag/v{version}")
+        lookup = "ManifestType: defaultLocale"
+        spec_content = spec_content.replace(lookup, f"ReleaseNotes: |-\n{changelog}\nReleaseNotesUrl: https://github.com/mtkennerly/shawl/releases/tag/v{version}\n{lookup}")
         spec.write_bytes(spec_content.encode("utf-8"))
 
         ctx.run(f"winget validate --manifest manifests/m/mtkennerly/shawl/{version}")
