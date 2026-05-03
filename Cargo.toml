@@ -1,6 +1,6 @@
 [package]
 name = "shawl"
-version = "1.8.0"
+version = "1.9.0"
 authors = ["mtkennerly <mtkennerly@gmail.com>"]
 edition = "2024"
 description = "Windows service wrapper for arbitrary commands"

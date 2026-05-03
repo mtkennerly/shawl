@@ -82,6 +82,10 @@ Options:
       --kill-process-tree
           Kill the entire process tree when the service stops. Uses a Windows Job Object to track
           and terminate all child processes automatically
+      --interactive
+          Abort if ctrl-C or ctrl-break is received unexpectedly. Use this option if you're running
+          Shawl from a terminal and want it to respect ctrl-C, or if you want the wrapped command to
+          be able to send a ctrl-C event that stops Shawl
       --cwd <path>
           Working directory in which to run the command. You may provide a relative path, and it
           will be converted to an absolute one
@@ -153,6 +157,10 @@ Options:
       --kill-process-tree
           Kill the entire process tree when the service stops. Uses a Windows Job Object to track
           and terminate all child processes automatically
+      --interactive
+          Abort if ctrl-C or ctrl-break is received unexpectedly. Use this option if you're running
+          Shawl from a terminal and want it to respect ctrl-C, or if you want the wrapped command to
+          be able to send a ctrl-C event that stops Shawl
       --cwd <path>
           Working directory in which to run the command. Must be an absolute path
       --name <NAME>

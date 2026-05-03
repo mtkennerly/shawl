@@ -1,4 +1,4 @@
-## Unreleased
+## v1.9.0 (2026-05-03)
 
 * Fixed: If the wrapped command sent its own ctrl-C event,
   that would cause Shawl to exit unexpectedly.
